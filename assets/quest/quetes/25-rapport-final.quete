@@ -1,0 +1,230 @@
+@chapitre 5 · Le coup de feu
+@titre Quête finale : le rapport du service
+@notion Synthèse : un traitement de données complet, 100 % fonctionnel
+@xp 400
+@retenir un gros problème se résout en petites fonctions pures qu'on nomme, qu'on teste séparément et qu'on assemble.
+
+=== cours
+## Le grand service
+
+> 🍽 Fin de soirée. Le patron veut le rapport : chiffre d'affaires, ticket moyen, plat vedette, répartition par catégorie. Toutes les réponses sont dans les bons de commande. À toi de les faire parler.
+
+Cette quête n'introduit aucune notion nouvelle. Elle te demande de **combiner** celles des 24 précédentes sur un cas réaliste.
+
+## La méthode
+
+Un chef ne prépare pas un menu en un seul geste. Il le **découpe**.
+
+**1. Regarde la forme des données.** Des commandes, qui contiennent des lignes, qui portent un prix et une quantité.
+
+**2. Écris de petites fonctions nommées**, chacune pour une seule idée :
+
+```js
+const montant = (ligne) => ligne.prix * ligne.quantite;
+const somme = (nombres) => nombres.reduce((a, b) => a + b, 0);
+```
+
+**3. Prépare les données une fois.** Ici, presque tous les calculs partent de la même liste : les lignes des commandes payées. Calcule-la d'abord, puis réutilise-la.
+
+```js
+const payees = commandes.filter(...);
+const lignes = payees.flatMap(...);
+```
+
+**4. Repère les calculs qui se ressemblent.** « Quantité vendue par plat » et « chiffre par catégorie » sont le même calcul : un cumul par clé. Une seule fonction, paramétrée par deux fonctions, fait les deux.
+
+**5. Assemble** le tout dans l'objet final.
+
+## Ta boîte à outils
+
+- `filter`, `flatMap`, `map`, `reduce` (chapitre 2 et quête 17)
+- reduce vers un objet, avec clé calculée (quête 16)
+- `Object.entries` puis `sort` pour trouver le maximum (quête 20)
+- une fonction qui reçoit des fonctions en paramètre (quêtes 5 et 11)
+- l'arrondi à deux décimales (quête 14)
+
+## Les règles du fonctionnel, toutes ensemble
+
+Que des `const`. Aucune boucle. Aucune mutation des données reçues. Des fonctions pures. Si tu respectes cela, ton rapport donnera le même résultat ce soir, demain et dans dix ans.
+
+=== doc
+## Forme des données
+
+```js
+{
+  id: 1,
+  table: 4,
+  statut: 'payée',            // ou 'annulée'
+  lignes: [
+    { nom: 'Burger', categorie: 'plat', prix: 14, quantite: 2 },
+  ],
+}
+```
+
+## Forme du rapport
+
+```js
+{
+  chiffreAffaires: 101,        // somme des prix × quantite des commandes payées
+  nombreCommandes: 3,          // nombre de commandes payées
+  ticketMoyen: 33.67,          // chiffre / nombre, arrondi à 2 décimales (0 si aucune)
+  platLePlusVendu: 'Burger',   // plus grande quantité totale (null si aucune vente)
+  parCategorie: { plat: 69, dessert: 18, entrée: 14 },
+}
+```
+
+## Briques utiles
+
+```js
+const arrondir = (n) => Math.round(n * 100) / 100;
+
+// cumul par clé : { clé: somme des valeurs }
+const cumuler = (elements, cle, valeur) =>
+  elements.reduce((acc, e) => ({ ...acc, [cle(e)]: (acc[cle(e)] || 0) + valeur(e) }), {});
+
+// clé de la plus grande valeur
+const [premier] = Object.entries(objet).sort(([, a], [, b]) => b - a);
+```
+
+`const [premier] = tableau` prend le premier élément ; il vaut `undefined` si le tableau est vide.
+
+=== exemple
+// Les briques du rapport, sur un petit jeu de données. Expérimente ici avant le défi.
+
+const commandes = [
+  { id: 1, statut: 'payée', lignes: [{ nom: 'Burger', categorie: 'plat', prix: 14, quantite: 2 }] },
+  { id: 2, statut: 'annulée', lignes: [{ nom: 'Risotto', categorie: 'plat', prix: 13, quantite: 3 }] },
+  { id: 3, statut: 'payée', lignes: [{ nom: 'Tiramisu', categorie: 'dessert', prix: 6, quantite: 1 }] },
+];
+
+const payees = commandes.filter((c) => c.statut === 'payée');
+const lignes = payees.flatMap((c) => c.lignes);
+console.log('lignes payées :', lignes.map((l) => l.nom));
+
+const montant = (ligne) => ligne.prix * ligne.quantite;
+console.log('montants :', lignes.map(montant));
+
+const cumuler = (elements, cle, valeur) =>
+  elements.reduce((acc, e) => ({ ...acc, [cle(e)]: (acc[cle(e)] || 0) + valeur(e) }), {});
+
+console.log('par catégorie :', cumuler(lignes, (l) => l.categorie, montant));
+console.log('quantités     :', cumuler(lignes, (l) => l.nom, (l) => l.quantite));
+
+=== consigne
+## Quête finale : le rapport du service
+
+Écris `rapportDuService(commandes)`. Elle renvoie un objet avec cinq propriétés, calculées **uniquement sur les commandes dont le statut est `'payée'`** :
+
+1. `chiffreAffaires` : somme des `prix × quantite` de toutes les lignes.
+2. `nombreCommandes` : nombre de commandes payées.
+3. `ticketMoyen` : chiffre d'affaires divisé par le nombre de commandes, **arrondi à 2 décimales**. `0` s'il n'y a aucune commande payée.
+4. `platLePlusVendu` : nom du plat dont la **quantité totale** est la plus grande. `null` s'il n'y a aucune vente.
+5. `parCategorie` : objet `{ catégorie: chiffre d'affaires de la catégorie }`.
+
+La forme exacte des données est dans l'onglet **Doc**.
+
+**Règles :** uniquement `const`. Pas de boucle, pas de `push`. Les commandes reçues ne doivent pas être modifiées. Découpe ton code en petites fonctions.
+
+=== depart
+// Quête 25 — Le rapport du service
+
+// Conseil : écris d'abord de petites fonctions (montant d'une ligne, somme, cumul par clé…),
+// puis assemble-les dans rapportDuService.
+
+const rapportDuService = (commandes) => {
+  // TODO
+  return {
+    chiffreAffaires: 0,
+    nombreCommandes: 0,
+    ticketMoyen: 0,
+    platLePlusVendu: null,
+    parCategorie: {},
+  };
+};
+
+module.exports = { rapportDuService };
+
+=== solution
+// Quête 25 — Le rapport du service
+
+const arrondir = (n) => Math.round(n * 100) / 100;
+const somme = (nombres) => nombres.reduce((a, b) => a + b, 0);
+const montant = (ligne) => ligne.prix * ligne.quantite;
+
+// { clé: somme des valeurs } pour une liste d'éléments
+const cumuler = (elements, cle, valeur) =>
+  elements.reduce((acc, e) => ({ ...acc, [cle(e)]: (acc[cle(e)] || 0) + valeur(e) }), {});
+
+// clé associée à la plus grande valeur, ou null si l'objet est vide
+const cleDuMaximum = (objet) => {
+  const [premier] = Object.entries(objet).sort(([, a], [, b]) => b - a);
+  return premier ? premier[0] : null;
+};
+
+const rapportDuService = (commandes) => {
+  const payees = commandes.filter((commande) => commande.statut === 'payée');
+  const lignes = payees.flatMap((commande) => commande.lignes);
+  const chiffreAffaires = somme(lignes.map(montant));
+  return {
+    chiffreAffaires,
+    nombreCommandes: payees.length,
+    ticketMoyen: payees.length === 0 ? 0 : arrondir(chiffreAffaires / payees.length),
+    platLePlusVendu: cleDuMaximum(cumuler(lignes, (ligne) => ligne.nom, (ligne) => ligne.quantite)),
+    parCategorie: cumuler(lignes, (ligne) => ligne.categorie, montant),
+  };
+};
+
+module.exports = { rapportDuService };
+
+=== indices
+Commence par deux constantes : `payees` (un `filter` sur le statut) et `lignes` (un `flatMap` sur `payees`). Presque tout le reste part de `lignes`.
+---
+`chiffreAffaires` : `lignes.map(montant)` puis une somme. `parCategorie` et les quantités par plat sont le même calcul : un `reduce` vers un objet, comme dans la quête 16. La fonction `cumuler` de l'onglet Doc fait les deux.
+---
+Plat le plus vendu : cumule les quantités par nom, puis `Object.entries(...).sort(([, a], [, b]) => b - a)` et prends le nom de la première paire, ou `null` si la liste est vide. Ticket moyen : `payees.length === 0 ? 0 : arrondir(chiffreAffaires / payees.length)`.
+
+=== tests
+interdit(/\b(for|while)\b|\.forEach\(/, 'pas de boucle for, while ni forEach');
+interdit(/\b(let|var)\b/, 'uniquement const (ni let, ni var)');
+interdit(/\.push\(/, 'pas de push');
+const COMMANDES = () => [
+  { id: 1, table: 4, statut: 'payée', lignes: [
+    { nom: 'Burger', categorie: 'plat', prix: 14, quantite: 2 },
+    { nom: 'Tiramisu', categorie: 'dessert', prix: 6, quantite: 1 },
+  ] },
+  { id: 2, table: 2, statut: 'annulée', lignes: [{ nom: 'Risotto', categorie: 'plat', prix: 13, quantite: 5 }] },
+  { id: 3, table: 7, statut: 'payée', lignes: [
+    { nom: 'Soupe', categorie: 'entrée', prix: 7, quantite: 1 },
+    { nom: 'Burger', categorie: 'plat', prix: 14, quantite: 1 },
+    { nom: 'Tiramisu', categorie: 'dessert', prix: 6, quantite: 2 },
+  ] },
+  { id: 4, table: 1, statut: 'payée', lignes: [
+    { nom: 'Risotto', categorie: 'plat', prix: 13, quantite: 1 },
+    { nom: 'Soupe', categorie: 'entrée', prix: 7, quantite: 1 },
+    { nom: 'Burger', categorie: 'plat', prix: 14, quantite: 1 },
+  ] },
+];
+test('chiffreAffaires additionne prix × quantité des commandes payées', (m, t) =>
+  t.egal(m.rapportDuService(COMMANDES()).chiffreAffaires, 101, 'La commande annulée ne doit pas être comptée.'));
+test('nombreCommandes compte les commandes payées', (m, t) => t.egal(m.rapportDuService(COMMANDES()).nombreCommandes, 3));
+test('ticketMoyen est arrondi à deux décimales', (m, t) => t.egal(m.rapportDuService(COMMANDES()).ticketMoyen, 33.67));
+test('platLePlusVendu se base sur la quantité totale, hors commandes annulées', (m, t) =>
+  t.egal(m.rapportDuService(COMMANDES()).platLePlusVendu, 'Burger', 'Le Risotto annulé (5 unités) ne compte pas.'));
+test('parCategorie donne le chiffre de chaque catégorie', (m, t) =>
+  t.egal(m.rapportDuService(COMMANDES()).parCategorie, { plat: 69, dessert: 18, entrée: 14 }));
+test('le rapport complet a exactement la forme attendue', (m, t) =>
+  t.egal(m.rapportDuService(COMMANDES()), {
+    chiffreAffaires: 101,
+    nombreCommandes: 3,
+    ticketMoyen: 33.67,
+    platLePlusVendu: 'Burger',
+    parCategorie: { plat: 69, dessert: 18, entrée: 14 },
+  }));
+test('sans commande payée, le rapport est à zéro', (m, t) => {
+  const vide = { chiffreAffaires: 0, nombreCommandes: 0, ticketMoyen: 0, platLePlusVendu: null, parCategorie: {} };
+  t.egal(m.rapportDuService([]), vide);
+  t.egal(m.rapportDuService([COMMANDES()[1]]), vide, 'Avec seulement une commande annulée :');
+});
+test('les commandes reçues ne sont pas modifiées', (m, t) => t.sansMutation(COMMANDES(), (c) => m.rapportDuService(c)));
+test('la fonction est pure : deux appels donnent le même rapport', (m, t) =>
+  t.egal(m.rapportDuService(COMMANDES()), m.rapportDuService(COMMANDES())));

@@ -1,0 +1,153 @@
+@chapitre 1 · La mise en place
+@titre Une fiche par plat
+@notion Immutabilité des objets, spread et déstructuration
+@xp 50
+@retenir { ...objet, cle: valeur } crée une copie modifiée. L'objet d'origine ne bouge pas.
+
+=== cours
+## Les objets aussi restent intacts
+
+> 🍽 Chaque plat a sa fiche. Pour changer un prix, on ne gomme pas l'ancienne fiche : on en rédige une nouvelle, et on archive l'ancienne.
+
+Un plat se décrit par un objet :
+
+```js
+const burger = { nom: 'Burger', prix: 14 };
+```
+
+## Le piège
+
+```js
+burger.prix = 16; // modifie l'objet d'origine : tout le programme voit 16
+```
+
+## Copier en changeant une propriété
+
+Le spread fonctionne aussi dans les objets. Les propriétés écrites **après** `...` remplacent les anciennes.
+
+```js
+const burgerPlusCher = { ...burger, prix: 16 };
+
+burger;         // { nom: 'Burger', prix: 14 } — intact
+burgerPlusCher; // { nom: 'Burger', prix: 16 }
+```
+
+On peut aussi **ajouter** une propriété :
+
+```js
+const burgerVege = { ...burger, vegetarien: true };
+```
+
+## Retirer une propriété : la déstructuration
+
+```js
+const { prix, ...reste } = burger;
+// prix  → 14
+// reste → { nom: 'Burger' }
+```
+
+On « sort » `prix` et on récupère tout le reste dans un nouvel objet. Aucun `delete` nécessaire.
+
+## Raccourci
+
+Quand la variable porte le même nom que la propriété, `{ prix: prix }` s'écrit `{ prix }`.
+
+=== doc
+## Copier et modifier
+
+```js
+{ ...objet }                  // copie
+{ ...objet, prix: 16 }        // copie avec une valeur remplacée
+{ ...objet, nouveau: true }   // copie avec une propriété ajoutée
+{ ...a, ...b }                // fusion (b l'emporte)
+```
+
+## Déstructurer
+
+```js
+const { nom, prix } = plat;        // lire deux propriétés
+const { prix, ...reste } = plat;   // tout sauf prix
+const f = ({ nom }) => nom;        // directement dans les paramètres
+```
+
+## Renvoyer un objet depuis une fléchée
+
+Il faut des parenthèses, sinon les accolades sont prises pour le corps de la fonction :
+
+```js
+const creer = (nom) => ({ nom, prix: 0 });
+```
+
+=== exemple
+// Copier un objet en le modifiant.
+
+const burger = { nom: 'Burger', prix: 14, allergenes: ['gluten'] };
+
+const plusCher = { ...burger, prix: 16 };
+console.log('copie    :', plusCher);
+console.log('original :', burger);
+
+// Retirer une propriété sans delete :
+const { allergenes, ...sansAllergenes } = burger;
+console.log('sans allergènes :', sansAllergenes);
+
+=== consigne
+## Défi : mettre à jour les fiches
+
+Un plat ressemble à `{ nom: 'Burger', prix: 14, allergenes: ['gluten'] }`. Écris trois fonctions qui renvoient un **nouvel** objet :
+
+1. `changerPrix(plat, prix)` : le même plat avec le nouveau prix.
+2. `marquerVegetarien(plat)` : le même plat avec `vegetarien: true`.
+3. `sansAllergenes(plat)` : le même plat **sans** la propriété `allergenes`.
+
+**Règle :** pas de `delete`. Les tests vérifient que le plat d'origine reste intact.
+
+=== depart
+// Quête 4 — Une fiche par plat
+
+const changerPrix = (plat, prix) => {
+  // TODO : copie du plat avec le nouveau prix
+};
+
+const marquerVegetarien = (plat) => {
+  // TODO : copie du plat avec vegetarien: true
+};
+
+const sansAllergenes = (plat) => {
+  // TODO : copie du plat sans la propriété allergenes
+};
+
+module.exports = { changerPrix, marquerVegetarien, sansAllergenes };
+
+=== solution
+// Quête 4 — Une fiche par plat
+
+const changerPrix = (plat, prix) => ({ ...plat, prix });
+
+const marquerVegetarien = (plat) => ({ ...plat, vegetarien: true });
+
+const sansAllergenes = (plat) => {
+  const { allergenes, ...reste } = plat;
+  return reste;
+};
+
+module.exports = { changerPrix, marquerVegetarien, sansAllergenes };
+
+=== indices
+`{ ...plat, prix: nouveauPrix }` recopie toutes les propriétés du plat, puis remplace le prix.
+---
+Pour renvoyer un objet depuis une fléchée sans accolades de bloc, entoure-le de parenthèses : `(plat) => ({ ...plat, vegetarien: true })`.
+---
+Pour retirer : `const { allergenes, ...reste } = plat; return reste;`
+
+=== tests
+interdit(/\bdelete\b/, 'pas de delete');
+const BURGER = () => ({ nom: 'Burger', prix: 14, allergenes: ['gluten'] });
+test('changerPrix renvoie le plat avec le nouveau prix', (m, t) =>
+  t.egal(m.changerPrix(BURGER(), 16), { nom: 'Burger', prix: 16, allergenes: ['gluten'] }));
+test('changerPrix ne modifie pas le plat d\'origine', (m, t) => t.sansMutation(BURGER(), (p) => m.changerPrix(p, 16)));
+test('marquerVegetarien ajoute vegetarien: true', (m, t) =>
+  t.egal(t.sansMutation({ nom: 'Risotto', prix: 13 }, (p) => m.marquerVegetarien(p)), { nom: 'Risotto', prix: 13, vegetarien: true }));
+test('sansAllergenes retire la propriété allergenes', (m, t) =>
+  t.egal(m.sansAllergenes(BURGER()), { nom: 'Burger', prix: 14 }));
+test('sansAllergenes ne modifie pas le plat d\'origine', (m, t) => t.sansMutation(BURGER(), (p) => m.sansAllergenes(p)));

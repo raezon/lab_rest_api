@@ -1,0 +1,147 @@
+@notion Polling, Server-Sent Events, WebSocket
+@xp 150
+
+=== cours
+## Prévenir le client quand quelque chose change
+
+> 🚗 Le polling, c'est l'enfant à l'arrière qui demande « on est arrivés ? » toutes les minutes. Les Server-Sent Events, c'est le GPS qui annonce lui-même chaque étape.
+
+En HTTP classique, le serveur ne parle que si on l'interroge. Comment suivre une commande qui passe de « reçue » à « en cuisine » puis « prête » ?
+
+## Le polling
+
+Le client **redemande** régulièrement.
+
+```js
+setInterval(() => fetch('/api/commandes/42'), 3000);
+```
+
+C'est simple, mais la plupart des requêtes ne servent à rien : la réponse est identique à la précédente. Et le client apprend le changement avec du retard.
+
+## Server-Sent Events (SSE)
+
+Le client ouvre **une seule** connexion. Le serveur la garde ouverte et y **pousse** un message à chaque changement.
+
+Trois choses à faire côté serveur.
+
+**1. Annoncer un flux et envoyer les en-têtes tout de suite**
+
+```js
+res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+res.flushHeaders();
+```
+
+**2. Écrire les messages sans fermer la réponse**
+
+On utilise `res.write` (qui laisse la connexion ouverte) et non `res.json` (qui la termine). Chaque message a un format précis : `data: `, le contenu, puis **deux** retours à la ligne.
+
+```js
+res.write(`data: ${JSON.stringify(commande)}\n\n`);
+```
+
+**3. Se souvenir des clients connectés**
+
+Pour pouvoir leur écrire plus tard, on garde leurs objets `res` dans une collection, et on les en retire quand ils partent.
+
+```js
+abonnes.add(res);
+req.on('close', () => abonnes.delete(res));
+```
+
+Oublier ce retrait crée une fuite de mémoire, et le serveur écrira dans des connexions fermées.
+
+## Diffuser un changement
+
+```js
+for (const abonne of abonnes) abonne.write(`data: ${JSON.stringify(commande)}\n\n`);
+```
+
+## Et WebSocket ?
+
+SSE va dans **un seul sens** : du serveur vers le client. WebSocket est **bidirectionnel**, utile pour un chat ou un jeu. Pour suivre un état (commande, notification, cours de bourse), SSE suffit et reste du HTTP ordinaire.
+
+=== doc
+## Ouvrir un flux SSE
+
+```js
+app.get('/chemin/events', (req, res) => {
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+  res.flushHeaders();
+  res.write(`data: ${JSON.stringify(etat)}\n\n`); // état courant, immédiatement
+  abonnes.add(res);
+  req.on('close', () => abonnes.delete(res));
+});
+```
+
+## Format d'un message
+
+```js
+data: {"id":42,"statut":"prete"}
+(ligne vide)
+```
+
+## Set
+
+```js
+const abonnes = new Set();
+abonnes.add(x);  abonnes.delete(x);  abonnes.size
+for (const a of abonnes) { … }
+```
+
+## Côté navigateur
+
+```js
+const source = new EventSource('/api/commandes/42/events');
+source.onmessage = (e) => console.log(JSON.parse(e.data));
+```
+
+## Dans l'onglet Requête
+
+Une réponse SSE ne se termine jamais : la connexion est coupée après 1,5 s et ce qui a été reçu est affiché. Tu dois y voir l'état courant de la commande.
+
+=== exemple
+// Exemple — un flux SSE « horloge » : le serveur pousse, le client ne redemande rien.
+const express = require('express');
+const app = express();
+
+app.get('/horloge', (req, res) => {
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+  res.flushHeaders();
+  let n = 0;
+  const minuterie = setInterval(() => res.write(`data: ${JSON.stringify({ tic: ++n })}\n\n`), 200);
+  req.on('close', () => clearInterval(minuterie)); // le client est parti : on arrête
+});
+
+const serveur = app.listen(0, async () => {
+  const res = await fetch(`http://localhost:${serveur.address().port}/horloge`);
+  console.log(res.status, res.headers.get('content-type'));
+
+  // Une seule requête : on lit les messages au fur et à mesure qu'ils arrivent.
+  const lecteur = res.body.getReader();
+  for (let i = 0; i < 3; i++) {
+    const { value } = await lecteur.read();
+    console.log('reçu :', JSON.stringify(new TextDecoder().decode(value)));
+  }
+
+  await lecteur.cancel();
+  serveur.closeAllConnections();
+  serveur.close();
+});
+
+=== requetes
+GET /api/commandes/42
+GET /api/commandes/42/events
+POST /api/commandes/42/avancer
+
+=== indices
+Crée la route du flux : `app.get('/api/commandes/42/events', (req, res) => { … })`.
+---
+Annonce un flux et envoie les en-têtes tout de suite : `res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });` puis `res.flushHeaders();`.
+---
+Un message SSE s'écrit avec `res.write`, pas `res.json`. Le texte est un gabarit entre accents graves : `data: ${JSON.stringify(commande)}\n\n` (deux retours à la ligne à la fin).
+---
+Envoie l'état courant dès la connexion avec ce format, puis garde la connexion : `abonnes.add(res);`.
+---
+À la déconnexion, retire l'abonné : `req.on('close', () => abonnes.delete(res));`.
+---
+Dans `avancer()`, après le changement de statut, pousse le message à tous : `for (const abonne of abonnes) abonne.write(...)` avec le même format que plus haut.

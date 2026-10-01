@@ -1,0 +1,171 @@
+@chapitre 4 · Le garde-manger
+@titre Le grand livre des prix
+@notion Object.entries et Object.fromEntries
+@xp 150
+@retenir Object.entries change un objet en tableau de paires, sur lequel map, filter et sort fonctionnent. Object.fromEntries fait le chemin inverse.
+
+=== cours
+## map et filter sur un objet
+
+> 🍽 Le grand livre des prix associe chaque plat à son tarif. Pour appliquer une hausse à tout le livre, on en tire des **fiches volantes**, on les corrige une à une, puis on relie un nouveau livre.
+
+Un objet n'a pas de `map` ni de `filter`. On le convertit donc en tableau, on travaille, puis on le reconstruit.
+
+```js
+const carte = { Burger: 14, Soupe: 7 };
+
+Object.entries(carte);
+// [['Burger', 14], ['Soupe', 7]]
+```
+
+Chaque paire `[clé, valeur]` devient un petit tableau à deux cases.
+
+## Le chemin inverse
+
+```js
+Object.fromEntries([['Burger', 14], ['Soupe', 7]]);
+// { Burger: 14, Soupe: 7 }
+```
+
+## L'aller-retour complet
+
+```js
+const plusCher = Object.fromEntries(
+  Object.entries(carte).map(([nom, prix]) => [nom, prix + 1])
+);
+// { Burger: 15, Soupe: 8 }
+```
+
+`([nom, prix])` **déstructure** la paire directement dans les paramètres : pas besoin d'écrire `paire[0]` et `paire[1]`.
+
+## Filtrer un objet
+
+```js
+Object.fromEntries(Object.entries(carte).filter(([nom, prix]) => prix >= 10));
+// { Burger: 14 }
+```
+
+## Classer
+
+Un objet n'a pas d'ordre fiable. Pour un classement, on reste en tableau :
+
+```js
+Object.entries(carte)
+  .sort(([, a], [, b]) => b - a)  // par valeur décroissante
+  .map(([nom]) => nom);            // ['Burger', 'Soupe']
+```
+
+`[, a]` ignore la première case et ne nomme que la seconde.
+
+=== doc
+## Trois vues d'un objet
+
+```js
+Object.keys(o)     // ['Burger', 'Soupe']
+Object.values(o)   // [14, 7]
+Object.entries(o)  // [['Burger', 14], ['Soupe', 7]]
+```
+
+## Aller-retour
+
+```js
+Object.fromEntries(Object.entries(o).map(([cle, valeur]) => [cle, f(valeur)]))
+Object.fromEntries(Object.entries(o).filter(([cle, valeur]) => test(valeur)))
+```
+
+## Déstructurer une paire
+
+```js
+([cle, valeur]) => ...   // les deux
+([cle]) => ...           // la clé seulement
+([, valeur]) => ...      // la valeur seulement
+```
+
+## Somme des valeurs
+
+```js
+Object.values(o).reduce((a, b) => a + b, 0)
+```
+
+=== exemple
+// Transformer un objet en passant par ses paires [clé, valeur].
+
+const carte = { Burger: 14, Soupe: 7, Tiramisu: 6 };
+
+console.log(Object.entries(carte));
+
+const plusCher = Object.fromEntries(Object.entries(carte).map(([nom, prix]) => [nom, prix + 1]));
+console.log(plusCher);
+
+const classement = Object.entries(carte)
+  .sort(([, a], [, b]) => b - a)
+  .map(([nom]) => nom);
+console.log(classement);
+
+console.log('original intact :', carte);
+
+=== consigne
+## Défi : réviser le grand livre
+
+La carte est un objet `{ nomDuPlat: prix }`.
+
+1. `appliquerHausse(carte, euros)` renvoie une nouvelle carte où chaque prix est augmenté de `euros`.
+2. `platsChers(carte, seuil)` renvoie une nouvelle carte ne contenant que les plats dont le prix est **supérieur ou égal** au seuil.
+3. `classement(chiffres)` : `chiffres` est un objet `{ nom: montant }`. Renvoie le tableau des **noms**, du montant le plus élevé au plus faible.
+
+**Règles :** pas de boucle. L'objet reçu ne doit pas être modifié.
+
+=== depart
+// Quête 20 — Le grand livre des prix
+
+const appliquerHausse = (carte, euros) => {
+  // TODO : entries → map → fromEntries
+};
+
+const platsChers = (carte, seuil) => {
+  // TODO : entries → filter → fromEntries
+};
+
+const classement = (chiffres) => {
+  // TODO : entries → sort → map
+};
+
+module.exports = { appliquerHausse, platsChers, classement };
+
+=== solution
+// Quête 20 — Le grand livre des prix
+
+const appliquerHausse = (carte, euros) =>
+  Object.fromEntries(Object.entries(carte).map(([nom, prix]) => [nom, prix + euros]));
+
+const platsChers = (carte, seuil) => Object.fromEntries(Object.entries(carte).filter(([, prix]) => prix >= seuil));
+
+const classement = (chiffres) =>
+  Object.entries(chiffres)
+    .sort(([, a], [, b]) => b - a)
+    .map(([nom]) => nom);
+
+module.exports = { appliquerHausse, platsChers, classement };
+
+=== indices
+`Object.entries(carte)` donne un tableau de paires. Chaque étape reçoit une paire, qu'on déstructure : `([nom, prix]) => ...`.
+---
+Dans le `map`, renvoie une **paire** : `[nom, prix + euros]`. Puis referme avec `Object.fromEntries(...)`.
+---
+`classement` : `Object.entries(chiffres).sort(([, a], [, b]) => b - a).map(([nom]) => nom)`. `Object.entries` crée un tableau neuf : le trier ne modifie pas l'objet reçu.
+
+=== tests
+interdit(/\b(for|while)\b|\.forEach\(/, 'pas de boucle for, while ni forEach');
+const CARTE = () => ({ Burger: 14, Soupe: 7, Risotto: 13, Tiramisu: 6 });
+test('appliquerHausse augmente chaque prix', (m, t) =>
+  t.egal(t.sansMutation(CARTE(), (c) => m.appliquerHausse(c, 1)), { Burger: 15, Soupe: 8, Risotto: 14, Tiramisu: 7 }));
+test('appliquerHausse renvoie un nouvel objet', (m, t) => {
+  const carte = CARTE();
+  t.vrai(m.appliquerHausse(carte, 0) !== carte, 'L\'objet renvoyé est le même que celui reçu.');
+});
+test('platsChers garde les plats au prix supérieur ou égal au seuil', (m, t) =>
+  t.egal(t.sansMutation(CARTE(), (c) => m.platsChers(c, 13)), { Burger: 14, Risotto: 13 }));
+test('platsChers renvoie {} si aucun plat n\'atteint le seuil', (m, t) => t.egal(m.platsChers(CARTE(), 100), {}));
+test('classement trie les noms du plus gros montant au plus petit', (m, t) =>
+  t.egal(t.sansMutation({ entrée: 120, plat: 540, dessert: 210 }, (c) => m.classement(c)), ['plat', 'dessert', 'entrée']));
+test('classement d\'un objet vide renvoie []', (m, t) => t.egal(m.classement({}), []));

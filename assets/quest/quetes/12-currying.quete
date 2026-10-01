@@ -1,0 +1,165 @@
+@chapitre 3 · La fabrique à fonctions
+@titre Un ingrédient à la fois
+@notion Currying : un paramètre par appel
+@xp 120
+@retenir une fonction curryfiée reçoit ses arguments un par un. Chaque appel partiel donne une fonction plus spécialisée.
+
+=== cours
+## Le currying
+
+> 🍽 On ne verse pas tout dans la casserole d'un coup. D'abord le beurre, puis l'oignon, puis le riz. À chaque étape, la préparation est **plus avancée** et attend l'ingrédient suivant.
+
+Une fonction **curryfiée** reçoit ses paramètres **un par un**. Chaque appel renvoie une fonction qui attend le suivant.
+
+```js
+// classique : tout d'un coup
+const ajouter = (a, b) => a + b;
+ajouter(2, 3); // 5
+
+// curryfiée : un par un
+const ajouter = (a) => (b) => a + b;
+ajouter(2)(3); // 5
+```
+
+C'est la technique de la quête précédente, appliquée systématiquement à tous les paramètres.
+
+## L'intérêt : spécialiser
+
+```js
+const ajouterDeux = ajouter(2); // une fonction prête à l'emploi
+
+[1, 2, 3].map(ajouterDeux); // [3, 4, 5]
+```
+
+## L'ordre des paramètres
+
+On place en premier ce qui **change le moins** (la configuration), et en dernier **la donnée**.
+
+```js
+const prixFinal = (tva) => (remise) => (prix) => (prix - remise) * (1 + tva);
+
+const prixRestaurant = prixFinal(0.1);     // la TVA est fixée
+const prixHappyHour = prixRestaurant(2);   // la remise aussi
+prixHappyHour(12); // 11
+```
+
+## Curryfier une fonction existante
+
+On peut écrire un petit outil qui transforme une fonction à deux paramètres :
+
+```js
+const curry2 = (fn) => (a) => (b) => fn(a, b);
+```
+
+`curry2` reçoit une fonction et en renvoie une nouvelle : c'est une fonction d'ordre supérieur.
+
+=== doc
+## Forme curryfiée
+
+```js
+const f = (a) => (b) => (c) => resultat;
+
+f(1)(2)(3);          // appel complet
+const g = f(1);      // spécialisation partielle
+const h = g(2);
+h(3);
+```
+
+## Règle d'ordre
+
+Configuration d'abord, donnée en dernier :
+
+```js
+const multiplier = (facteur) => (nombre) => nombre * facteur;
+prix.map(multiplier(1.1));
+```
+
+## Curryfier
+
+```js
+const curry2 = (fn) => (a) => (b) => fn(a, b);
+const curry3 = (fn) => (a) => (b) => (c) => fn(a, b, c);
+```
+
+## Vocabulaire
+
+- **Curryfier** : transformer `f(a, b)` en `f(a)(b)`.
+- **Arité** : le nombre de paramètres d'une fonction.
+
+=== exemple
+// Currying : les paramètres arrivent un par un.
+
+const ajouter = (a) => (b) => a + b;
+
+console.log(ajouter(2)(3));        // appel complet
+const ajouterDeux = ajouter(2);    // fonction spécialisée
+console.log([1, 2, 3].map(ajouterDeux));
+
+const prixFinal = (tva) => (remise) => (prix) => (prix - remise) * (1 + tva);
+const prixRestaurant = prixFinal(0.1);
+const prixHappyHour = prixRestaurant(2);
+
+console.log(prixHappyHour(12).toFixed(2));
+console.log([12, 22, 32].map(prixHappyHour).map((p) => p.toFixed(2)));
+
+=== consigne
+## Défi : la caisse configurable
+
+1. `ajouter` curryfiée : `ajouter(2)(3)` renvoie `5`.
+2. `prixFinal` curryfiée à trois niveaux : `prixFinal(tva)(remise)(prix)` renvoie `(prix − remise) × (1 + tva)`. Exemple : `prixFinal(0.1)(2)(12)` renvoie `11`.
+3. `curry2(fn)` transforme une fonction à deux paramètres en fonction curryfiée : `curry2((a, b) => a * b)(3)(4)` renvoie `12`.
+
+=== depart
+// Quête 12 — Un ingrédient à la fois
+
+// ajouter(2)(3) → 5
+const ajouter = (a) => {
+  // TODO : renvoyer une fonction qui attend b
+};
+
+// prixFinal(tva)(remise)(prix) → (prix - remise) * (1 + tva)
+const prixFinal = (tva) => {
+  // TODO
+};
+
+// curry2(fn)(a)(b) → fn(a, b)
+const curry2 = (fn) => {
+  // TODO
+};
+
+module.exports = { ajouter, prixFinal, curry2 };
+
+=== solution
+// Quête 12 — Un ingrédient à la fois
+
+const ajouter = (a) => (b) => a + b;
+
+const prixFinal = (tva) => (remise) => (prix) => (prix - remise) * (1 + tva);
+
+const curry2 = (fn) => (a) => (b) => fn(a, b);
+
+module.exports = { ajouter, prixFinal, curry2 };
+
+=== indices
+Une flèche par paramètre : `(a) => (b) => a + b`.
+---
+`prixFinal` enchaîne trois flèches : `(tva) => (remise) => (prix) => ...`. Le calcul se fait seulement dans la dernière.
+---
+`const curry2 = (fn) => (a) => (b) => fn(a, b);` : on collecte `a`, puis `b`, puis on appelle la fonction d'origine avec les deux.
+
+=== tests
+test('ajouter(2) renvoie une fonction', (m, t) =>
+  t.vrai(typeof m.ajouter(2) === 'function', `ajouter(2) renvoie ${typeof m.ajouter(2)} au lieu d'une fonction.`));
+test('ajouter(2)(3) renvoie 5', (m, t) => t.egal(m.ajouter(2)(3), 5));
+test('ajouter(10) se réutilise avec map', (m, t) => t.egal([1, 2, 3].map(m.ajouter(10)), [11, 12, 13]));
+test('prixFinal(0.1)(2)(12) renvoie 11', (m, t) => t.proche(m.prixFinal(0.1)(2)(12), 11));
+test('prixFinal se spécialise étape par étape', (m, t) => {
+  const restaurant = m.prixFinal(0.1);
+  t.vrai(typeof restaurant === 'function' && typeof restaurant(0) === 'function', 'prixFinal(tva) puis prixFinal(tva)(remise) doivent renvoyer des fonctions.');
+  t.proche(restaurant(0)(100), 110);
+  t.proche(restaurant(10)(100), 99);
+});
+test('curry2 curryfie une fonction à deux paramètres', (m, t) => {
+  t.egal(m.curry2((a, b) => a * b)(3)(4), 12);
+  t.egal(m.curry2((a, b) => `${a}-${b}`)('table')(7), 'table-7');
+});

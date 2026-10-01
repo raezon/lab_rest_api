@@ -1,0 +1,206 @@
+@chapitre 5 · Le coup de feu
+@titre Retour en cuisine
+@notion Gérer les erreurs comme des valeurs (Result)
+@xp 200
+@retenir au lieu de lancer une exception, une fonction peut renvoyer un résultat « ok » ou « erreur ». L'échec devient une valeur qu'on transmet et qu'on enchaîne.
+
+=== cours
+## L'erreur comme valeur
+
+> 🍽 Quand une commande est incomplète, le serveur ne jette pas l'assiette par terre. Il rapporte le bon en cuisine avec une note : « table manquante ». Le problème **circule** proprement.
+
+`throw` interrompt brutalement le programme et oblige à entourer les appels de `try/catch`. Rien, dans la signature d'une fonction, n'indique qu'elle peut échouer.
+
+En style fonctionnel, on préfère **renvoyer** l'échec : la fonction donne **toujours** une valeur, qui dit si tout s'est bien passé.
+
+## Le type Résultat
+
+Deux petites fabriques suffisent :
+
+```js
+const ok = (valeur) => ({ ok: true, valeur });
+const erreur = (message) => ({ ok: false, erreur: message });
+```
+
+Une fonction qui peut échouer renvoie l'un ou l'autre :
+
+```js
+const diviser = (a, b) => (b === 0 ? erreur('Division par zéro') : ok(a / b));
+
+diviser(10, 2); // { ok: true, valeur: 5 }
+diviser(10, 0); // { ok: false, erreur: 'Division par zéro' }
+```
+
+Cette fonction reste **pure** : mêmes entrées, même sortie, aucune surprise.
+
+## Enchaîner sans tester à chaque étape
+
+Écrire `if (r.ok)` après chaque appel devient vite lourd. On isole ce test dans un outil :
+
+```js
+const enchainer = (resultat, fn) => (resultat.ok ? fn(resultat.valeur) : resultat);
+```
+
+- Si le résultat est **ok**, on poursuit avec `fn`, qui renvoie elle-même un résultat.
+- Si c'est une **erreur**, on la laisse passer telle quelle : les étapes suivantes sont ignorées.
+
+```js
+enchainer(diviser(10, 2), (x) => diviser(x, 0));
+// { ok: false, erreur: 'Division par zéro' }
+```
+
+La première erreur rencontrée traverse toute la chaîne jusqu'au bout. On ne la traite qu'**une fois**, à la fin.
+
+## Valider par étapes
+
+Avec le ternaire enchaîné, une validation se lit comme une liste de contrôles :
+
+```js
+const valider = (x) =>
+  typeof x !== 'number' ? erreur('Pas un nombre')
+  : x < 0 ? erreur('Négatif')
+  : ok(x);
+```
+
+=== doc
+## Le type Résultat
+
+```js
+const ok = (valeur) => ({ ok: true, valeur });
+const erreur = (message) => ({ ok: false, erreur: message });
+```
+
+## Enchaîner
+
+```js
+const enchainer = (resultat, fn) => (resultat.ok ? fn(resultat.valeur) : resultat);
+```
+
+`fn` doit elle-même renvoyer un résultat (`ok(...)` ou `erreur(...)`).
+
+## Lire le résultat, au bord du programme
+
+```js
+const r = traiter(commande);
+console.log(r.ok ? `Total : ${r.valeur}` : `Refusée : ${r.erreur}`);
+```
+
+## Vocabulaire
+
+Ce motif s'appelle *Result* ou *Either* dans d'autres langages (Rust, Haskell, Elm). `enchainer` y porte le nom de `flatMap`, `chain` ou `andThen`.
+
+=== exemple
+// L'erreur est une valeur : elle se transmet au lieu d'interrompre.
+
+const ok = (valeur) => ({ ok: true, valeur });
+const erreur = (message) => ({ ok: false, erreur: message });
+const enchainer = (resultat, fn) => (resultat.ok ? fn(resultat.valeur) : resultat);
+
+const diviser = (a, b) => (b === 0 ? erreur('Division par zéro') : ok(a / b));
+
+console.log(diviser(10, 2));
+console.log(diviser(10, 0));
+
+// Partager l'addition : 120 € divisés par le nombre de convives, puis par 2 moyens de paiement.
+const partager = (total, convives) => enchainer(diviser(total, convives), (part) => diviser(part, 2));
+
+console.log(partager(120, 4));
+console.log(partager(120, 0)); // l'erreur de la première étape traverse la seconde
+
+=== consigne
+## Défi : valider les commandes sans exception
+
+Une commande ressemble à `{ table: 4, plats: [{ nom: 'Burger', prix: 14 }] }`.
+
+1. `ok(valeur)` renvoie `{ ok: true, valeur }`.
+2. `erreur(message)` renvoie `{ ok: false, erreur: message }`.
+3. `enchainer(resultat, fn)` applique `fn` à la valeur si le résultat est ok, sinon renvoie le résultat **tel quel**.
+4. `validerCommande(commande)` renvoie, dans cet ordre de vérification :
+   - `erreur('Table manquante')` si `table` n'est pas un nombre ;
+   - `erreur('Commande vide')` si `plats` est vide ;
+   - `ok(commande)` sinon.
+5. `totalCommande(commande)` renvoie `ok(total des prix)` si la commande est valide, sinon l'erreur de validation. Construis-la avec `validerCommande` et `enchainer`.
+
+**Règle :** ni `throw`, ni `try`.
+
+=== depart
+// Quête 22 — Retour en cuisine
+
+const ok = (valeur) => {
+  // TODO
+};
+
+const erreur = (message) => {
+  // TODO
+};
+
+const enchainer = (resultat, fn) => {
+  // TODO
+};
+
+const validerCommande = (commande) => {
+  // TODO : 'Table manquante', puis 'Commande vide', sinon ok(commande)
+};
+
+const totalCommande = (commande) => {
+  // TODO : avec validerCommande et enchainer
+};
+
+module.exports = { ok, erreur, enchainer, validerCommande, totalCommande };
+
+=== solution
+// Quête 22 — Retour en cuisine
+
+const ok = (valeur) => ({ ok: true, valeur });
+
+const erreur = (message) => ({ ok: false, erreur: message });
+
+const enchainer = (resultat, fn) => (resultat.ok ? fn(resultat.valeur) : resultat);
+
+const validerCommande = (commande) =>
+  typeof commande.table !== 'number' ? erreur('Table manquante')
+  : commande.plats.length === 0 ? erreur('Commande vide')
+  : ok(commande);
+
+const totalCommande = (commande) =>
+  enchainer(validerCommande(commande), (valide) => ok(valide.plats.reduce((somme, plat) => somme + plat.prix, 0)));
+
+module.exports = { ok, erreur, enchainer, validerCommande, totalCommande };
+
+=== indices
+`ok` et `erreur` renvoient chacune un objet : pense aux parenthèses autour des accolades, `(valeur) => ({ ok: true, valeur })`.
+---
+`enchainer` : `resultat.ok ? fn(resultat.valeur) : resultat`. Pour la validation, teste `typeof commande.table !== 'number'` en premier, puis `commande.plats.length === 0`.
+---
+`totalCommande` : `enchainer(validerCommande(commande), (valide) => ok(...))`. La fonction passée à `enchainer` doit elle-même renvoyer un `ok(...)` contenant la somme des prix.
+
+=== tests
+interdit(/\b(throw|try)\b/, 'ni throw, ni try');
+const VALIDE = () => ({ table: 4, plats: [{ nom: 'Burger', prix: 14 }, { nom: 'Tiramisu', prix: 6 }] });
+test('ok et erreur construisent les deux formes de résultat', (m, t) => {
+  t.egal(m.ok(5), { ok: true, valeur: 5 });
+  t.egal(m.erreur('Oups'), { ok: false, erreur: 'Oups' });
+});
+test('enchainer applique la fonction à un résultat ok', (m, t) =>
+  t.egal(m.enchainer({ ok: true, valeur: 5 }, (x) => ({ ok: true, valeur: x * 2 })), { ok: true, valeur: 10 }));
+test('enchainer laisse passer une erreur sans appeler la fonction', (m, t) => {
+  const e = { ok: false, erreur: 'Oups' };
+  let appelee = false;
+  const r = m.enchainer(e, (x) => {
+    appelee = true;
+    return { ok: true, valeur: x };
+  });
+  t.vrai(!appelee, 'La fonction a été appelée alors que le résultat était une erreur.');
+  t.egal(r, { ok: false, erreur: 'Oups' });
+});
+test('validerCommande accepte une commande complète', (m, t) => t.egal(m.validerCommande(VALIDE()), { ok: true, valeur: VALIDE() }));
+test('validerCommande refuse une commande sans table', (m, t) =>
+  t.egal(m.validerCommande({ plats: [{ nom: 'Burger', prix: 14 }] }), { ok: false, erreur: 'Table manquante' }));
+test('validerCommande refuse une commande vide', (m, t) =>
+  t.egal(m.validerCommande({ table: 2, plats: [] }), { ok: false, erreur: 'Commande vide' }));
+test('la table est vérifiée avant les plats', (m, t) =>
+  t.egal(m.validerCommande({ plats: [] }), { ok: false, erreur: 'Table manquante' }));
+test('totalCommande renvoie ok(total) pour une commande valide', (m, t) =>
+  t.egal(t.sansMutation(VALIDE(), (c) => m.totalCommande(c)), { ok: true, valeur: 20 }));
+test('totalCommande transmet l\'erreur de validation', (m, t) =>
+  t.egal(m.totalCommande({ table: 2, plats: [] }), { ok: false, erreur: 'Commande vide' }));

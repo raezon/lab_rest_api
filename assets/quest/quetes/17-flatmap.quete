@@ -1,0 +1,171 @@
+@chapitre 4 · Le garde-manger
+@titre La liste de courses
+@notion flatMap, flat et Set pour dédoublonner
+@xp 150
+@retenir flatMap transforme chaque élément en tableau puis aplatit le tout. [...new Set(tableau)] retire les doublons.
+
+=== cours
+## Des tableaux dans des tableaux
+
+> 🍽 Chaque table a sa commande, chaque commande ses plats, chaque plat ses ingrédients. Pour faire les courses, il faut **une seule liste**, sans doublon.
+
+Quand chaque élément contient lui-même un tableau, `map` produit un tableau de tableaux :
+
+```js
+const commandes = [
+  { table: 1, plats: ['Soupe', 'Burger'] },
+  { table: 2, plats: ['Burger'] },
+];
+
+commandes.map((c) => c.plats);
+// [['Soupe', 'Burger'], ['Burger']]
+```
+
+## flat : aplatir
+
+```js
+[['Soupe', 'Burger'], ['Burger']].flat();
+// ['Soupe', 'Burger', 'Burger']
+```
+
+## flatMap : les deux d'un coup
+
+```js
+commandes.flatMap((c) => c.plats);
+// ['Soupe', 'Burger', 'Burger']
+```
+
+`flatMap` applique la fonction, puis aplatit d'un niveau. C'est `map` suivi de `flat`.
+
+## Retirer les doublons avec Set
+
+Un `Set` est une collection qui **n'accepte chaque valeur qu'une fois**. On le reconvertit en tableau avec le spread.
+
+```js
+const uniques = [...new Set(['Soupe', 'Burger', 'Burger'])];
+// ['Soupe', 'Burger']
+```
+
+L'ordre de première apparition est conservé.
+
+## Enchaîner deux niveaux
+
+Avec trois niveaux d'imbrication (commandes, plats, ingrédients), on enchaîne deux `flatMap` : le premier donne tous les plats, le second tous les ingrédients.
+
+=== doc
+## Aplatir
+
+```js
+t.flat()                 // aplatit d'un niveau
+t.flatMap((e) => tableau) // map puis flat
+```
+
+`flatMap` peut aussi **filtrer et transformer** en une passe : renvoyer `[]` supprime l'élément.
+
+```js
+[1, 2, 3].flatMap((n) => (n % 2 ? [n * 10] : [])); // [10, 30]
+```
+
+## Dédoublonner
+
+```js
+[...new Set(tableau)]
+```
+
+Fonctionne pour les valeurs simples (textes, nombres). Deux objets différents au contenu identique restent distincts.
+
+## Trier du texte
+
+```js
+[...noms].sort()                          // ordre alphabétique simple
+[...noms].sort((a, b) => a.localeCompare(b)) // gère accents et majuscules
+```
+
+=== exemple
+// Aplatir des données imbriquées et retirer les doublons.
+
+const commandes = [
+  { table: 1, plats: ['Soupe', 'Burger'] },
+  { table: 2, plats: ['Burger', 'Tiramisu'] },
+];
+
+console.log('map     :', commandes.map((c) => c.plats));
+console.log('flatMap :', commandes.flatMap((c) => c.plats));
+
+const tous = commandes.flatMap((c) => c.plats);
+console.log('uniques :', [...new Set(tous)]);
+console.log('triés   :', [...new Set(tous)].sort());
+
+=== consigne
+## Défi : préparer les courses
+
+Une commande ressemble à :
+
+```js
+{ table: 1, plats: [{ nom: 'Burger', ingredients: ['pain', 'boeuf', 'salade'] }] }
+```
+
+1. `dedoublonner(tableau)` renvoie le tableau sans doublon, dans l'ordre de première apparition.
+2. `tousLesPlats(commandes)` renvoie la liste **à plat** des noms de plats de toutes les commandes (doublons conservés).
+3. `listeDeCourses(commandes)` renvoie tous les ingrédients nécessaires, **sans doublon**, triés par **ordre alphabétique**.
+
+**Règle :** pas de boucle, pas de `push`.
+
+=== depart
+// Quête 17 — La liste de courses
+
+const dedoublonner = (tableau) => {
+  // TODO
+};
+
+const tousLesPlats = (commandes) => {
+  // TODO : flatMap
+};
+
+const listeDeCourses = (commandes) => {
+  // TODO : tous les ingrédients, sans doublon, triés
+};
+
+module.exports = { dedoublonner, tousLesPlats, listeDeCourses };
+
+=== solution
+// Quête 17 — La liste de courses
+
+const dedoublonner = (tableau) => [...new Set(tableau)];
+
+const tousLesPlats = (commandes) => commandes.flatMap((commande) => commande.plats).map((plat) => plat.nom);
+
+const listeDeCourses = (commandes) =>
+  dedoublonner(commandes.flatMap((commande) => commande.plats).flatMap((plat) => plat.ingredients)).sort();
+
+module.exports = { dedoublonner, tousLesPlats, listeDeCourses };
+
+=== indices
+`[...new Set(tableau)]` retire les doublons. `commandes.flatMap((c) => c.plats)` donne tous les plats à plat.
+---
+Pour les ingrédients, enchaîne un second `flatMap` : `.flatMap((plat) => plat.ingredients)`.
+---
+`listeDeCourses` : aplatis jusqu'aux ingrédients, passe le résultat à `dedoublonner`, puis termine par `.sort()`. Le tableau renvoyé par `dedoublonner` est neuf : le trier ne modifie rien d'autre.
+
+=== tests
+interdit(/\b(for|while)\b|\.forEach\(|\.push\(/, 'pas de boucle ni de push');
+const COMMANDES = () => [
+  { table: 1, plats: [
+    { nom: 'Burger', ingredients: ['pain', 'boeuf', 'salade'] },
+    { nom: 'Soupe', ingredients: ['carotte', 'oignon'] },
+  ] },
+  { table: 2, plats: [{ nom: 'Burger', ingredients: ['pain', 'boeuf', 'salade'] }] },
+  { table: 3, plats: [] },
+  { table: 4, plats: [{ nom: 'Salade', ingredients: ['salade', 'tomate', 'oignon'] }] },
+];
+test('dedoublonner retire les doublons en gardant l\'ordre', (m, t) =>
+  t.egal(t.sansMutation(['b', 'a', 'b', 'c', 'a'], (x) => m.dedoublonner(x)), ['b', 'a', 'c']));
+test('dedoublonner renvoie un nouveau tableau', (m, t) => {
+  const original = ['a', 'b'];
+  t.vrai(m.dedoublonner(original) !== original, 'Le tableau renvoyé est le même objet que celui reçu.');
+});
+test('tousLesPlats renvoie les noms à plat, doublons compris', (m, t) =>
+  t.egal(m.tousLesPlats(COMMANDES()), ['Burger', 'Soupe', 'Burger', 'Salade']));
+test('listeDeCourses renvoie les ingrédients uniques, triés', (m, t) =>
+  t.egal(t.sansMutation(COMMANDES(), (c) => m.listeDeCourses(c)), ['boeuf', 'carotte', 'oignon', 'pain', 'salade', 'tomate']));
+test('listeDeCourses sans commande renvoie []', (m, t) => t.egal(m.listeDeCourses([]), []));

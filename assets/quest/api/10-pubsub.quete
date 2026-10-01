@@ -1,0 +1,138 @@
+@notion Publication / abonnement, découplage, vers les microservices
+@xp 150
+
+=== cours
+## Découpler avec des événements
+
+> 📣 La cuisine crie « commande 12 prête ! ». Le serveur, la caisse et le livreur réagissent chacun de leur côté. La cuisine ne sait même pas qui écoute.
+
+Quand une commande est créée, il faut prévenir le client, émettre une facture, mettre à jour le stock… La première idée est de tout faire dans la route.
+
+## Le problème du couplage
+
+```js
+app.post('/api/commandes', (req, res) => {
+  const commande = creer(req.body);
+  notifications.push(…);  // la route connaît les notifications
+  factures.push(…);       // … et la facturation
+  res.status(201).json(commande);
+});
+```
+
+Chaque nouveau besoin oblige à **modifier cette route**. Elle grossit, et une panne de la facturation fait échouer la création de la commande.
+
+## Publier, s'abonner
+
+On introduit un intermédiaire : le **bus d'événements**.
+
+- Le **producteur** publie un événement sur un sujet : « une commande a été créée ». Il ne sait pas qui l'écoute.
+- Les **abonnés** déclarent leur intérêt pour ce sujet et réagissent chacun à leur manière.
+
+Node.js fournit un bus en mémoire : `EventEmitter`.
+
+```js
+const { EventEmitter } = require('events');
+const bus = new EventEmitter();
+
+bus.on('commande.creee', (commande) => { /* un abonné */ });
+
+bus.emit('commande.creee', commande); // le producteur publie
+```
+
+## Ce que ça change
+
+La route ne fait plus que son travail : valider, créer, **publier**, répondre.
+
+```js
+app.post('/api/commandes', (req, res) => {
+  // valider… créer…
+  bus.emit('commande.creee', commande);
+  res.status(201).json(commande);
+});
+```
+
+Pour ajouter un service (le stock, une statistique), on ajoute **un abonné**. La route ne change pas.
+
+## Nommer les événements
+
+Un événement décrit un **fait passé** : `commande.creee`, `paiement.recu`. Ce n'est pas un ordre : le producteur annonce ce qui s'est produit, les abonnés décident quoi en faire.
+
+## Vers les microservices
+
+En production, le bus devient un service à part (Kafka, RabbitMQ, NATS) et chaque abonné, un programme indépendant, déployé séparément. Le principe reste exactement celui-ci. C'est le point de départ d'une architecture en microservices.
+
+=== doc
+## EventEmitter
+
+```js
+const { EventEmitter } = require('events');
+const bus = new EventEmitter();
+
+bus.on('sujet', (donnees) => { … });  // s'abonner
+bus.emit('sujet', donnees);           // publier
+```
+
+Plusieurs abonnés peuvent écouter le même sujet : ils sont appelés dans l'ordre d'inscription.
+
+## Valider une commande
+
+```js
+const { client, montant } = req.body;
+if (!client || typeof montant !== 'number') {
+  return res.status(400).json({ error: 'client et montant requis' });
+}
+```
+
+## Ce que les abonnés enregistrent
+
+- notifications : le texte `Commande <id> reçue pour <client>`
+- facturation : l'objet `{ commandeId, montant }`
+
+## La règle du défi
+
+La route `POST /api/commandes` ne doit contenir ni `notifications.push` ni `factures.push`. Ces lignes vivent dans les abonnés.
+
+## Limite d'EventEmitter
+
+Il fonctionne dans un seul processus et perd les événements si le programme s'arrête. Un vrai broker les conserve et les distribue entre plusieurs machines.
+
+=== exemple
+// Exemple — un producteur, plusieurs abonnés qui ne se connaissent pas.
+const { EventEmitter } = require('events');
+const bus = new EventEmitter();
+
+// Deux abonnés au même sujet
+bus.on('plat.pret', (plat) => console.log(`  [salle]  j'apporte « ${plat.nom} » à la table ${plat.table}`));
+bus.on('plat.pret', (plat) => console.log(`  [caisse] j'ajoute ${plat.prix} € à l'addition de la table ${plat.table}`));
+
+// Le producteur publie sans savoir qui écoute
+const annoncer = (plat) => {
+  console.log(`[cuisine] ${plat.nom} prêt !`);
+  bus.emit('plat.pret', plat);
+};
+
+annoncer({ nom: 'Burger', prix: 14, table: 3 });
+
+// Un nouveau service arrive : on l'abonne, sans toucher à la cuisine.
+bus.on('plat.pret', (plat) => console.log(`  [stats]  un ${plat.nom} de plus vendu`));
+
+annoncer({ nom: 'Tiramisu', prix: 6, table: 5 });
+
+=== requetes
+POST /api/commandes | {"client":"Alice","montant":24}
+POST /api/commandes | {"client":"Eve"}
+GET /api/notifications
+GET /api/factures
+
+=== indices
+Un abonné se déclare une seule fois, en dehors de toute route : `bus.on('commande.creee', (cmd) => { … })`.
+---
+Abonné notifications : `notifications.push('Commande ' + cmd.id + ' reçue pour ' + cmd.client)`.
+---
+Abonné facturation, dans un second `bus.on` : `factures.push({ commandeId: cmd.id, montant: cmd.montant })`.
+---
+Route : `const { client, montant } = req.body;`, puis `if (!client || typeof montant !== 'number') return res.status(400).json({ error: 'client et montant requis' });`.
+---
+Crée la commande `{ id: nextId++, client, montant }`, publie avec `bus.emit('commande.creee', commande)`, puis réponds `res.status(201).json(commande)`.
+---
+Les tests lisent ton code : la route doit contenir `emit('commande.creee'` et ne contenir ni `notifications.push` ni `factures.push`. Écris-la sous la forme `app.post('/api/commandes', (req, res) => { … });`.

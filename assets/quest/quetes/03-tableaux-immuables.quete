@@ -1,0 +1,138 @@
+@chapitre 1 · La mise en place
+@titre Ne touche pas à la carte
+@notion Immutabilité des tableaux, opérateur spread
+@xp 50
+@retenir on ne modifie jamais un tableau reçu : on en construit un nouveau avec [...tableau, element] ou filter.
+
+=== cours
+## L'immutabilité
+
+> 🍽 La carte du restaurant est affichée en salle. Si un serveur la rature pour sa table, tous les autres clients lisent une carte fausse. Il vaut mieux **recopier** la carte et modifier sa copie.
+
+En style fonctionnel, on ne **modifie** pas une donnée : on en **crée une nouvelle**. Une donnée qui ne change jamais ne peut pas provoquer de surprise ailleurs dans le programme.
+
+## Le piège : les méthodes qui modifient
+
+```js
+const menu = ['Soupe', 'Burger'];
+menu.push('Tiramisu'); // modifie menu lui-même
+```
+
+`push`, `pop`, `shift`, `unshift` et `splice` **mutent** le tableau d'origine. `const` n'y change rien : il interdit de réaffecter la variable, pas de modifier le contenu.
+
+## La solution : le spread `...`
+
+`...menu` « déballe » les éléments d'un tableau dans un nouveau tableau.
+
+```js
+const menu = ['Soupe', 'Burger'];
+
+const avecDessert = [...menu, 'Tiramisu'];   // ajoute à la fin
+const avecEntree  = ['Salade', ...menu];     // ajoute au début
+
+menu; // ['Soupe', 'Burger'] — intact
+```
+
+## Retirer sans modifier
+
+`filter` renvoie un **nouveau** tableau avec les éléments qui passent le test :
+
+```js
+const sansSoupe = menu.filter((plat) => plat !== 'Soupe');
+```
+
+=== doc
+## Modifient le tableau (à éviter)
+
+`push` · `pop` · `shift` · `unshift` · `splice` · `sort` · `reverse`
+
+## Renvoient un nouveau tableau
+
+```js
+[...t, x]                 // ajouter à la fin
+[x, ...t]                 // ajouter au début
+[...a, ...b]              // fusionner
+t.filter((e) => e !== x)  // retirer
+t.slice(0, 2)             // extraire une partie
+```
+
+## const ne suffit pas
+
+```js
+const t = [1, 2];
+t.push(3);   // autorisé : le contenu change
+t = [];      // interdit : la variable ne peut pas être réaffectée
+```
+
+=== exemple
+// Mutation contre copie : observe ce qui arrive au tableau d'origine.
+
+const carte = ['Soupe', 'Burger'];
+
+const copieEtendue = [...carte, 'Tiramisu'];
+console.log('copie    :', copieEtendue);
+console.log('original :', carte); // intact
+
+const sansSoupe = carte.filter((plat) => plat !== 'Soupe');
+console.log('filtré   :', sansSoupe);
+
+// Essaie : remplace la ligne du spread par carte.push('Tiramisu') et regarde « original ».
+
+=== consigne
+## Défi : gérer la carte sans la raturer
+
+Le menu est un tableau de noms de plats. Écris trois fonctions qui renvoient un **nouveau** tableau :
+
+1. `ajouterPlat(menu, plat)` : le plat est ajouté **à la fin**.
+2. `platDuJourEnPremier(menu, plat)` : le plat est ajouté **au début**.
+3. `retirerPlat(menu, plat)` : le plat n'y figure plus.
+
+**Règle :** `push`, `pop`, `shift`, `unshift` et `splice` sont interdits. Les tests vérifient que le menu d'origine reste intact.
+
+=== depart
+// Quête 3 — Ne touche pas à la carte
+
+const ajouterPlat = (menu, plat) => {
+  // TODO : nouveau tableau avec le plat à la fin
+};
+
+const platDuJourEnPremier = (menu, plat) => {
+  // TODO : nouveau tableau avec le plat au début
+};
+
+const retirerPlat = (menu, plat) => {
+  // TODO : nouveau tableau sans ce plat
+};
+
+module.exports = { ajouterPlat, platDuJourEnPremier, retirerPlat };
+
+=== solution
+// Quête 3 — Ne touche pas à la carte
+
+const ajouterPlat = (menu, plat) => [...menu, plat];
+
+const platDuJourEnPremier = (menu, plat) => [plat, ...menu];
+
+const retirerPlat = (menu, plat) => menu.filter((p) => p !== plat);
+
+module.exports = { ajouterPlat, platDuJourEnPremier, retirerPlat };
+
+=== indices
+Le spread `...menu` recopie tous les éléments du menu dans un nouveau tableau entre crochets.
+---
+`[...menu, plat]` ajoute à la fin, `[plat, ...menu]` ajoute au début.
+---
+Pour retirer : `menu.filter((p) => p !== plat)` garde tous les plats différents de celui à enlever.
+
+=== tests
+interdit(/\.(push|pop|shift|unshift|splice)\(/, 'pas de push, pop, shift, unshift ni splice');
+test('ajouterPlat ajoute le plat à la fin', (m, t) =>
+  t.egal(m.ajouterPlat(['Soupe', 'Burger'], 'Tiramisu'), ['Soupe', 'Burger', 'Tiramisu']));
+test('ajouterPlat ne modifie pas le menu d\'origine', (m, t) =>
+  t.sansMutation(['Soupe', 'Burger'], (menu) => m.ajouterPlat(menu, 'Tiramisu')));
+test('platDuJourEnPremier ajoute le plat au début', (m, t) =>
+  t.egal(t.sansMutation(['Soupe', 'Burger'], (menu) => m.platDuJourEnPremier(menu, 'Risotto')), ['Risotto', 'Soupe', 'Burger']));
+test('retirerPlat enlève le plat demandé', (m, t) =>
+  t.egal(t.sansMutation(['Soupe', 'Burger', 'Tiramisu'], (menu) => m.retirerPlat(menu, 'Burger')), ['Soupe', 'Tiramisu']));
+test('retirerPlat renvoie un menu identique si le plat est absent', (m, t) =>
+  t.egal(m.retirerPlat(['Soupe'], 'Pizza'), ['Soupe']));

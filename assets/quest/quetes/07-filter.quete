@@ -1,0 +1,145 @@
+@chapitre 2 · À la chaîne
+@titre Le tri des commandes
+@notion filter : garder ce qui passe le test
+@xp 80
+@retenir filter garde les éléments pour lesquels la fonction renvoie true. Le tableau d'origine reste intact.
+
+=== cours
+## filter : sélectionner
+
+> 🍽 Le chef de rang parcourt la carte pour un client végétarien : il ne **change** aucun plat, il **garde** seulement ceux qui conviennent.
+
+`filter` prend une fonction qui répond **vrai ou faux** pour chaque élément. On appelle cette fonction un **prédicat**. Seuls les éléments qui obtiennent `true` sont conservés.
+
+```js
+const prix = [7, 14, 13, 6];
+
+prix.filter((p) => p < 10); // [7, 6]
+```
+
+Le résultat est un **nouveau** tableau, de longueur égale ou inférieure. Les éléments gardés ne sont pas transformés.
+
+## Avec des objets
+
+```js
+const menu = [
+  { nom: 'Soupe', prix: 7, vegetarien: true },
+  { nom: 'Burger', prix: 14, vegetarien: false },
+];
+
+menu.filter((plat) => plat.vegetarien);
+// [{ nom: 'Soupe', prix: 7, vegetarien: true }]
+```
+
+Quand la propriété est déjà un booléen, inutile d'écrire `=== true`.
+
+## map ou filter ?
+
+- `map` : **même nombre** d'éléments, mais **transformés**.
+- `filter` : **moins** d'éléments, mais **inchangés**.
+
+=== doc
+## filter
+
+```js
+tableau.filter((element) => condition)
+```
+
+- Garde les éléments pour lesquels la condition est vraie.
+- Renvoie un **nouveau** tableau ; `[]` si rien ne passe.
+
+## Écrire un prédicat
+
+```js
+(plat) => plat.vegetarien            // déjà un booléen
+(plat) => plat.prix <= 10            // comparaison
+(plat) => plat.categorie === 'plat'  // égalité stricte
+(plat) => !plat.vegetarien           // négation
+(plat) => plat.prix < 15 && plat.vegetarien // et
+```
+
+## Comparer
+
+Utilise toujours `===` et `!==` (égalité stricte), jamais `==`.
+
+=== exemple
+// filter garde les éléments qui passent le test.
+
+const menu = [
+  { nom: 'Salade César', prix: 9, categorie: 'entrée', vegetarien: false },
+  { nom: 'Soupe de légumes', prix: 7, categorie: 'entrée', vegetarien: true },
+  { nom: 'Burger', prix: 14, categorie: 'plat', vegetarien: false },
+  { nom: 'Tiramisu', prix: 6, categorie: 'dessert', vegetarien: true },
+];
+
+console.log(menu.filter((plat) => plat.vegetarien));
+console.log(menu.filter((plat) => plat.prix < 8));
+console.log(menu.filter((plat) => plat.categorie === 'pizza')); // rien ne passe : []
+
+=== consigne
+## Défi : conseiller les clients
+
+Chaque plat ressemble à `{ nom, prix, categorie, vegetarien }`. Écris trois fonctions avec `filter` :
+
+1. `vegetariens(menu)` renvoie les plats végétariens.
+2. `aPetitPrix(menu, max)` renvoie les plats dont le prix est **inférieur ou égal** à `max`.
+3. `parCategorie(menu, categorie)` renvoie les plats de la catégorie demandée.
+
+**Règles :** utilise `filter`. Pas de boucle `for`, `while` ni `forEach`.
+
+=== depart
+// Quête 7 — Le tri des commandes
+
+const vegetariens = (menu) => {
+  // TODO
+};
+
+const aPetitPrix = (menu, max) => {
+  // TODO : prix inférieur ou égal à max
+};
+
+const parCategorie = (menu, categorie) => {
+  // TODO
+};
+
+module.exports = { vegetariens, aPetitPrix, parCategorie };
+
+=== solution
+// Quête 7 — Le tri des commandes
+
+const vegetariens = (menu) => menu.filter((plat) => plat.vegetarien);
+
+const aPetitPrix = (menu, max) => menu.filter((plat) => plat.prix <= max);
+
+const parCategorie = (menu, categorie) => menu.filter((plat) => plat.categorie === categorie);
+
+module.exports = { vegetariens, aPetitPrix, parCategorie };
+
+=== indices
+`menu.filter((plat) => ...)` : à droite de la flèche, écris une condition vraie pour les plats à garder.
+---
+« Inférieur ou égal » s'écrit `<=`. Un plat à exactement `max` euros doit être gardé.
+---
+`menu.filter((plat) => plat.categorie === categorie)` compare la catégorie du plat au paramètre reçu.
+
+=== tests
+const MENU = () => [
+  { nom: 'Salade César', prix: 9, categorie: 'entrée', vegetarien: false },
+  { nom: 'Soupe', prix: 7, categorie: 'entrée', vegetarien: true },
+  { nom: 'Burger', prix: 14, categorie: 'plat', vegetarien: false },
+  { nom: 'Risotto', prix: 13, categorie: 'plat', vegetarien: true },
+  { nom: 'Tiramisu', prix: 6, categorie: 'dessert', vegetarien: true },
+];
+const noms = (plats) => plats.map((p) => p.nom);
+requis(/\.filter\(/, 'utiliser filter');
+interdit(/\b(for|while)\b|\.forEach\(/, 'pas de boucle for, while ni forEach');
+test('vegetariens garde les plats végétariens', (m, t) => t.egal(noms(m.vegetariens(MENU())), ['Soupe', 'Risotto', 'Tiramisu']));
+test('aPetitPrix(menu, 9) garde les plats à 9 € ou moins', (m, t) =>
+  t.egal(noms(m.aPetitPrix(MENU(), 9)), ['Salade César', 'Soupe', 'Tiramisu'], 'Un plat à exactement 9 € doit être gardé.'));
+test('aPetitPrix(menu, 5) renvoie []', (m, t) => t.egal(m.aPetitPrix(MENU(), 5), []));
+test("parCategorie(menu, 'plat') garde les plats", (m, t) => t.egal(noms(m.parCategorie(MENU(), 'plat')), ['Burger', 'Risotto']));
+test('les plats gardés ne sont pas transformés et le menu reste intact', (m, t) => {
+  const menu = MENU();
+  const r = t.sansMutation(menu, (x) => m.parCategorie(x, 'dessert'));
+  t.egal(r, [{ nom: 'Tiramisu', prix: 6, categorie: 'dessert', vegetarien: true }]);
+});

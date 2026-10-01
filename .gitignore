@@ -1,0 +1,10 @@
+# Binaires compilés (voir « Compiler et distribuer » dans le README)
+/apilab
+/apilab.exe
+/dist/
+
+# Espaces de travail créés par apilab (code, score et profil de l'élève)
+/api-lab/
+/quete-api/
+/quete-fp/
+node_modules/

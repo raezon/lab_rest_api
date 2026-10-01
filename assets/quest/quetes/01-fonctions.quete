@@ -1,0 +1,143 @@
+@chapitre 1 · La mise en place
+@titre Ta première recette
+@notion Fonctions, return, fonctions fléchées
+@xp 50
+@retenir une fonction reçoit des paramètres et RENVOIE une valeur avec return. Sans return, elle renvoie undefined.
+
+=== cours
+## Une fonction, c'est une recette
+
+> 🍽 En cuisine, une recette prend des **ingrédients** et produit un **plat**. Une fonction prend des **paramètres** et **renvoie** un résultat.
+
+Tout le paradigme fonctionnel repose sur cette idée : on construit un programme en assemblant de petites fonctions, comme une brigade où chacun a un seul travail.
+
+```js
+function prixAvecService(prix) {
+  return prix + 2;
+}
+
+prixAvecService(10); // 12
+```
+
+- `prix` est le **paramètre** : l'ingrédient qui entre.
+- `return` désigne ce qui **sort**. Sans `return`, la fonction renvoie `undefined`.
+
+## La fonction fléchée
+
+C'est la même chose, en plus court. C'est l'écriture qu'on utilise le plus en style fonctionnel.
+
+```js
+const prixAvecService = (prix) => prix + 2;
+```
+
+Quand le corps tient en une seule expression, pas besoin d'accolades ni de `return` : la valeur est renvoyée automatiquement. Avec des accolades, le `return` redevient obligatoire :
+
+```js
+const prixAvecService = (prix) => {
+  return prix + 2;
+};
+```
+
+## Afficher n'est pas renvoyer
+
+`console.log` écrit dans le terminal, mais ne renvoie rien. Les tests regardent ce que ta fonction **renvoie**.
+
+=== doc
+## Écrire une fonction
+
+```js
+function nom(a, b) { return a + b; }   // déclaration
+const nom = (a, b) => a + b;           // fléchée, retour implicite
+const nom = (a, b) => { return a + b; }; // fléchée avec accolades
+```
+
+## Gabarits de texte
+
+Les accents graves permettent d'insérer une valeur dans un texte avec `${ }` :
+
+```js
+const nom = 'Alice';
+`Bonjour ${nom} !`   // 'Bonjour Alice !'
+```
+
+## Rendre une fonction visible
+
+```js
+module.exports = { prixTTC, saluer };
+```
+
+Cette ligne, en bas du fichier, donne tes fonctions aux tests. Ne la supprime pas.
+
+=== exemple
+// Exemple — clique sur « Exécuter » (ou Ctrl+Entrée), puis modifie et relance.
+
+// Une recette : un ingrédient entre, un plat sort.
+function prixAvecService(prix) {
+  return prix + 2;
+}
+
+// La même idée en fonction fléchée.
+const doubler = (n) => n * 2;
+
+// Un gabarit de texte : ${...} insère une valeur.
+const annoncer = (plat) => `Et un ${plat}, un !`;
+
+console.log(prixAvecService(10));
+console.log(doubler(21));
+console.log(annoncer('burger'));
+
+=== consigne
+## Défi : la caisse du restaurant
+
+Écris deux fonctions dans `defi.js` :
+
+1. `prixTTC(prixHT)` renvoie le prix avec **10 % de TVA**. Exemple : `prixTTC(10)` renvoie `11`.
+2. `saluer(nom)` renvoie le texte `Bienvenue, Alice !` pour `saluer('Alice')`. Écris-la en **fonction fléchée**.
+
+Clique sur **Vérifier** (ou Ctrl+S) pour lancer les tests.
+
+=== depart
+// Quête 1 — Ta première recette
+
+// prixTTC(prixHT) : renvoie le prix avec 10 % de TVA
+function prixTTC(prixHT) {
+  // TODO : return ...
+}
+
+// saluer(nom) : renvoie « Bienvenue, Alice ! » pour saluer('Alice')
+const saluer = (nom) => {
+  // TODO
+};
+
+// Astuce : console.log(prixTTC(10)) puis « Exécuter » pour voir ce que renvoie ta fonction.
+
+// Laisse cette ligne : elle rend tes fonctions visibles par les tests.
+module.exports = { prixTTC, saluer };
+
+=== solution
+// Quête 1 — Ta première recette
+
+function prixTTC(prixHT) {
+  return prixHT * 1.1;
+}
+
+const saluer = (nom) => `Bienvenue, ${nom} !`;
+
+module.exports = { prixTTC, saluer };
+
+=== indices
+10 % de TVA, c'est multiplier le prix par 1.1. N'oublie pas le mot `return`.
+---
+Pour le texte, utilise un gabarit entre accents graves : `Bienvenue, ${nom} !` (attention à l'espace avant le point d'exclamation).
+---
+`return prixHT * 1.1;` dans prixTTC, et `const saluer = (nom) => ...` avec le gabarit de l'indice précédent, sans accolades.
+
+=== tests
+test('prixTTC renvoie un nombre', (m, t) => {
+  const r = m.prixTTC(1);
+  t.vrai(typeof r === 'number', `prixTTC(1) renvoie ${r} : il manque sans doute le mot « return ».`);
+});
+test('prixTTC(10) renvoie 11', (m, t) => t.proche(m.prixTTC(10), 11));
+test('prixTTC(50) renvoie 55', (m, t) => t.proche(m.prixTTC(50), 55));
+test("saluer('Alice') renvoie « Bienvenue, Alice ! »", (m, t) => t.egal(m.saluer('Alice'), 'Bienvenue, Alice !'));
+test("saluer('Karim') renvoie « Bienvenue, Karim ! »", (m, t) => t.egal(m.saluer('Karim'), 'Bienvenue, Karim !'));

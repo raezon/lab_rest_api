@@ -1,0 +1,166 @@
+@notion Ressources, verbes HTTP, 200 / 201 / 204 / 400 / 404
+@xp 150
+
+=== cours
+## REST : des ressources et des verbes
+
+> 🍽 Les codes de statut, en trois phrases : 2xx « tout va bien », 4xx « c'est ta faute » (le client), 5xx « c'est la mienne » (le serveur).
+
+REST est une façon d'organiser une API. L'idée centrale : l'URL désigne **une chose** (une ressource), la méthode HTTP dit **quoi en faire**.
+
+## Les URL sont des noms, au pluriel
+
+- `/api/plats` : la collection de tous les plats
+- `/api/plats/3` : le plat numéro 3
+
+Pas de verbe dans l'URL : on n'écrit pas `/api/supprimerPlat`.
+
+## Les quatre opérations : CRUD
+
+- **C**reate : `POST /api/plats` crée un plat
+- **R**ead : `GET /api/plats` et `GET /api/plats/3` lisent
+- **U**pdate : `PUT /api/plats/3` remplace le plat 3
+- **D**elete : `DELETE /api/plats/3` le supprime
+
+## Lire un paramètre d'URL
+
+`:id` déclare un paramètre. Sa valeur arrive dans `req.params`, **sous forme de texte**.
+
+```js
+app.get('/api/plats/:id', (req, res) => {
+  const id = Number(req.params.id); // '3' → 3
+});
+```
+
+## Lire le corps de la requête
+
+Grâce à `app.use(express.json())`, le corps JSON est disponible dans `req.body`.
+
+```js
+const { nom, prix } = req.body;
+```
+
+## Le bon code pour chaque situation
+
+- `200 OK` : lecture ou modification réussie
+- `201 Created` : création réussie, avec l'en-tête `Location` qui donne l'URL du nouvel élément
+- `204 No Content` : suppression réussie, **sans corps**
+- `400 Bad Request` : données invalides
+- `404 Not Found` : la ressource n'existe pas
+
+```js
+res.status(201).location(`/api/plats/${plat.id}`).json(plat);
+res.status(204).end();
+res.status(404).json({ error: 'Plat introuvable' });
+```
+
+## Valider avant d'agir
+
+Ne fais jamais confiance aux données reçues. Vérifie-les et réponds `400` si elles sont incorrectes.
+
+```js
+if (!nom || typeof prix !== 'number') {
+  return res.status(400).json({ error: 'nom et prix requis' });
+}
+```
+
+Le `return` arrête la fonction : sans lui, le code continuerait et tenterait d'envoyer une seconde réponse.
+
+=== doc
+## Le tableau de bord du CRUD
+
+- `GET /api/plats` → `200` + liste
+- `GET /api/plats/:id` → `200` + plat, ou `404`
+- `POST /api/plats` → `201` + plat + `Location`, ou `400`
+- `PUT /api/plats/:id` → `200` + plat, ou `404`, ou `400`
+- `DELETE /api/plats/:id` → `204` sans corps, ou `404`
+
+## Outils
+
+```js
+req.params.id          // paramètre d'URL (texte !)
+req.body               // corps JSON
+Number('3')            // 3
+
+liste.find((x) => x.id === id)        // l'élément, ou undefined
+liste.findIndex((x) => x.id === id)   // sa position, ou -1
+liste.filter((x) => x.id !== id)      // la liste sans lui
+```
+
+## Réponses
+
+```js
+res.json(objet)                                  // 200
+res.status(201).location(url).json(objet)        // création
+res.status(204).end()                            // suppression
+res.status(400).json({ error: '…' })             // données invalides
+res.status(404).json({ error: '…' })             // absent
+```
+
+## Tester
+
+Dans l'onglet **Requête**, le serveur garde ses données tant que tu ne modifies pas le code : tu peux créer un plat, puis le relire, le modifier et le supprimer.
+
+=== exemple
+// Exemple — lire et créer sur une ressource « boissons » (le défi porte sur les plats).
+const express = require('express');
+const app = express();
+app.use(express.json());
+
+const boissons = [{ id: 1, nom: 'Limonade' }];
+
+app.get('/api/boissons', (req, res) => res.json(boissons));
+
+app.get('/api/boissons/:id', (req, res) => {
+  const boisson = boissons.find((b) => b.id === Number(req.params.id));
+  if (!boisson) return res.status(404).json({ error: 'Boisson introuvable' });
+  res.json(boisson);
+});
+
+app.post('/api/boissons', (req, res) => {
+  if (!req.body.nom) return res.status(400).json({ error: 'nom requis' });
+  const boisson = { id: boissons.length + 1, nom: req.body.nom };
+  boissons.push(boisson);
+  res.status(201).location(`/api/boissons/${boisson.id}`).json(boisson);
+});
+
+const serveur = app.listen(0, async () => {
+  const base = `http://localhost:${serveur.address().port}`;
+  const json = { 'Content-Type': 'application/json' };
+  const montrer = async (titre, res) => console.log(titre.padEnd(34), '→', res.status, await res.text());
+
+  await montrer('GET /api/boissons', await fetch(`${base}/api/boissons`));
+  const cree = await fetch(`${base}/api/boissons`, { method: 'POST', headers: json, body: JSON.stringify({ nom: 'Thé glacé' }) });
+  console.log('   en-tête Location :', cree.headers.get('location'));
+  await montrer('POST /api/boissons (valide)', cree);
+  await montrer('POST /api/boissons (sans nom)', await fetch(`${base}/api/boissons`, { method: 'POST', headers: json, body: '{}' }));
+  await montrer('GET /api/boissons/2', await fetch(`${base}/api/boissons/2`));
+  await montrer('GET /api/boissons/99', await fetch(`${base}/api/boissons/99`));
+
+  serveur.closeAllConnections();
+  serveur.close();
+});
+
+=== requetes
+GET /api/plats
+POST /api/plats | {"nom":"Burger","prix":11}
+POST /api/plats | {"nom":"Frites"}
+GET /api/plats/2
+PUT /api/plats/2 | {"nom":"Burger XL","prix":14}
+DELETE /api/plats/2
+GET /api/plats/999
+
+=== indices
+Avance route par route et essaie chacune dans l'onglet Requête. La première : `app.get('/api/plats', (req, res) => res.json(plats));`.
+---
+`req.params.id` est un texte. Convertis-le avant de comparer : `const id = Number(req.params.id);`.
+---
+Lire un plat : `const p = plats.find((x) => x.id === id);`, puis `if (!p) return res.status(404).json({ error: 'Plat introuvable' });` et enfin `res.json(p)`.
+---
+Créer : valide d'abord avec `if (!nom || typeof prix !== 'number') return res.status(400).json({ error: 'nom et prix requis' });`, puis construis `{ id: nextId++, nom, prix }` et ajoute-le à la liste.
+---
+Réponse de création : `res.status(201).location('/api/plats/' + p.id).json(p)`. Les tests vérifient l'en-tête Location.
+---
+Remplacer (PUT) : `const i = plats.findIndex((x) => x.id === id);`. Si `i < 0`, réponds 404. Sinon `plats[i] = { id: plats[i].id, nom, prix };` et renvoie-le.
+---
+Supprimer : `plats = plats.filter((x) => x.id !== id);`. Si la longueur n'a pas changé, le plat n'existait pas : 404. Sinon `res.status(204).end()`, sans corps.

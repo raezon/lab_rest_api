@@ -1,0 +1,156 @@
+@chapitre 3 · La fabrique à fonctions
+@titre La mise en place
+@notion Application partielle, paramètres du reste
+@xp 120
+@retenir l'application partielle fixe à l'avance certains arguments d'une fonction existante et renvoie une fonction qui attend les autres.
+
+=== cours
+## L'application partielle
+
+> 🍽 La mise en place : avant le service, on prépare tout ce qui peut l'être. Légumes taillés, fonds prêts. Au moment de la commande, il ne reste qu'à ajouter le dernier ingrédient.
+
+Le currying demande de réécrire la fonction. L'**application partielle** part d'une fonction **existante**, écrite de façon classique, et en **fixe les premiers arguments**.
+
+```js
+const calculerPrix = (tva, service, prix) => prix * (1 + tva) + service;
+
+// On fixe tva = 0.1 et service = 2 :
+const prixSurPlace = (prix) => calculerPrix(0.1, 2, prix);
+
+prixSurPlace(10); // 13
+```
+
+## Un outil générique : partiel
+
+Plutôt que d'écrire cette fléchée à la main chaque fois, on fabrique un outil.
+
+```js
+const partiel = (fn, ...premiers) => (...reste) => fn(...premiers, ...reste);
+
+const prixSurPlace = partiel(calculerPrix, 0.1, 2);
+```
+
+## Les trois points, encore
+
+- Dans les **paramètres**, `...premiers` **rassemble** tous les arguments restants dans un tableau. On parle de *paramètres du reste*.
+- Dans un **appel**, `...premiers` **déballe** le tableau en arguments séparés.
+
+```js
+const tout = (...args) => args;
+tout(1, 2, 3); // [1, 2, 3]
+
+Math.max(...[4, 9, 2]); // 9
+```
+
+## Currying ou application partielle ?
+
+- **Currying** : la fonction est conçue pour recevoir un argument à la fois.
+- **Application partielle** : on fixe quelques arguments d'une fonction ordinaire.
+
+Les deux poursuivent le même but : fabriquer des fonctions spécialisées à partir d'une fonction générale.
+
+=== doc
+## Paramètres du reste et déballage
+
+```js
+const f = (premier, ...autres) => autres; // rassembler
+f(1, 2, 3);                               // [2, 3]
+
+fn(...tableau);                           // déballer en arguments
+```
+
+## partiel
+
+```js
+const partiel = (fn, ...premiers) => (...reste) => fn(...premiers, ...reste);
+
+const saluer = (formule, nom) => `${formule}, ${nom} !`;
+const bonsoir = partiel(saluer, 'Bonsoir');
+bonsoir('Alice'); // 'Bonsoir, Alice !'
+```
+
+## bind
+
+JavaScript fournit un équivalent : `fn.bind(null, a, b)` renvoie `fn` avec `a` et `b` déjà fixés.
+
+=== exemple
+// Fixer à l'avance les premiers arguments d'une fonction existante.
+
+const calculerPrix = (tva, service, prix) => prix * (1 + tva) + service;
+
+// À la main :
+const prixSurPlace = (prix) => calculerPrix(0.1, 2, prix);
+console.log(prixSurPlace(10));
+
+// Paramètres du reste : ...args rassemble les arguments dans un tableau.
+const tout = (...args) => args;
+console.log(tout('a', 'b', 'c'));
+
+// Déballage : ...tableau redonne des arguments séparés.
+console.log(Math.max(...[4, 9, 2]));
+
+// bind fait de l'application partielle :
+const prixLivraison = calculerPrix.bind(null, 0.1, 5);
+console.log(prixLivraison(10));
+
+=== consigne
+## Défi : préparer les tarifs
+
+La fonction `calculerPrix(tva, service, prix)` est fournie. Ne la modifie pas.
+
+1. Écris `partiel(fn, ...premiers)` : elle renvoie une fonction qui appelle `fn` avec les arguments fixés, suivis de ceux reçus plus tard. `partiel(f, 1, 2)(3)` équivaut à `f(1, 2, 3)`.
+2. Avec `partiel`, crée `prixSurPlace` : TVA `0.1`, service `2`.
+3. Avec `partiel`, crée `prixAEmporter` : TVA `0.055`, service `0`.
+
+=== depart
+// Quête 13 — La mise en place
+
+// Fournie : ne pas modifier.
+const calculerPrix = (tva, service, prix) => prix * (1 + tva) + service;
+
+// partiel(fn, a, b)(c) → fn(a, b, c)
+const partiel = (fn, ...premiers) => {
+  // TODO : renvoyer une fonction qui attend le reste des arguments
+};
+
+// TODO : remplace undefined en utilisant partiel et calculerPrix
+const prixSurPlace = undefined;  // TVA 0.1, service 2
+const prixAEmporter = undefined; // TVA 0.055, service 0
+
+module.exports = { partiel, prixSurPlace, prixAEmporter };
+
+=== solution
+// Quête 13 — La mise en place
+
+const calculerPrix = (tva, service, prix) => prix * (1 + tva) + service;
+
+const partiel = (fn, ...premiers) => (...reste) => fn(...premiers, ...reste);
+
+const prixSurPlace = partiel(calculerPrix, 0.1, 2);
+const prixAEmporter = partiel(calculerPrix, 0.055, 0);
+
+module.exports = { partiel, prixSurPlace, prixAEmporter };
+
+=== indices
+`partiel` renvoie une fléchée qui rassemble le reste des arguments : `(...reste) => ...`.
+---
+Dans cette fléchée, appelle `fn` en déballant les deux groupes : `fn(...premiers, ...reste)`.
+---
+`const prixSurPlace = partiel(calculerPrix, 0.1, 2);` On passe `calculerPrix` sans parenthèses, puis les arguments à fixer.
+
+=== tests
+requis(/partiel\(\s*calculerPrix/, 'construire les tarifs avec partiel(calculerPrix, …)');
+const somme3 = (a, b, c) => a + b + c;
+test('partiel renvoie une fonction', (m, t) =>
+  t.vrai(typeof m.partiel(somme3, 1) === 'function', 'partiel(fn, 1) doit renvoyer une fonction.'));
+test('partiel(f, 1, 2)(3) équivaut à f(1, 2, 3)', (m, t) => t.egal(m.partiel(somme3, 1, 2)(3), 6));
+test('partiel(f, 1)(2, 3) équivaut à f(1, 2, 3)', (m, t) => t.egal(m.partiel(somme3, 1)(2, 3), 6));
+test('partiel respecte l\'ordre des arguments', (m, t) => t.egal(m.partiel((a, b) => a + b, 'chef-')('Alice'), 'chef-Alice'));
+test('prixSurPlace(10) renvoie 13', (m, t) => {
+  t.vrai(typeof m.prixSurPlace === 'function', 'prixSurPlace doit être une fonction : remplace undefined.');
+  t.proche(m.prixSurPlace(10), 13);
+});
+test('prixAEmporter(100) renvoie 105.5', (m, t) => {
+  t.vrai(typeof m.prixAEmporter === 'function', 'prixAEmporter doit être une fonction : remplace undefined.');
+  t.proche(m.prixAEmporter(100), 105.5);
+});

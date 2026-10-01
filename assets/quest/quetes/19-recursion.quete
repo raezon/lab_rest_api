@@ -1,0 +1,178 @@
+@chapitre 4 · Le garde-manger
+@titre La carte gigogne
+@notion Récursion sur une structure en arbre
+@xp 150
+@retenir une fonction récursive traite un cas simple directement, et confie le reste à elle-même sur un problème plus petit.
+
+=== cours
+## La récursion
+
+> 🍽 La carte contient des rubriques, qui contiennent des sous-rubriques, qui contiennent des plats. Comme des poupées gigognes : pour tout compter, on ouvre chaque boîte et on recommence à l'intérieur.
+
+Une fonction **récursive** s'appelle elle-même. En style fonctionnel, elle remplace les boucles, et elle est le seul outil naturel pour les données **en arbre**, dont la profondeur n'est pas connue à l'avance.
+
+## Les deux ingrédients
+
+1. **Le cas de base** : la situation simple, qu'on résout sans se rappeler. Sans lui, la fonction tourne à l'infini.
+2. **Le cas récursif** : on se rappelle sur un problème **plus petit**.
+
+```js
+const somme = (nombres) =>
+  nombres.length === 0
+    ? 0                                      // cas de base
+    : nombres[0] + somme(nombres.slice(1));  // cas récursif
+```
+
+`somme([7, 14, 6])` devient `7 + somme([14, 6])`, puis `7 + 14 + somme([6])`, et ainsi de suite jusqu'au tableau vide.
+
+## Sur un arbre
+
+Notre carte est faite de deux sortes de nœuds :
+
+```js
+{ nom: 'Burger', prix: 14 }             // un plat : une feuille
+{ nom: 'Plats', enfants: [ ... ] }      // une rubrique : elle a des enfants
+```
+
+Pour compter les plats :
+
+- **cas de base** : un plat compte pour `1` ;
+- **cas récursif** : une rubrique vaut la **somme** de ce que valent ses enfants.
+
+```js
+const compter = (noeud) =>
+  !noeud.enfants ? 1 : noeud.enfants.reduce((total, enfant) => total + compter(enfant), 0);
+```
+
+La fonction ne se soucie pas de la profondeur : chaque niveau fait confiance au niveau inférieur.
+
+## Récursion et méthodes de tableau
+
+`reduce`, `map` et `flatMap` se marient très bien avec la récursion : on les applique aux enfants en leur passant la fonction elle-même.
+
+=== doc
+## Squelette d'une fonction récursive
+
+```js
+const f = (probleme) =>
+  estSimple(probleme) ? reponseDirecte : combiner(f(plusPetit(probleme)));
+```
+
+## Sur un arbre
+
+```js
+const estFeuille = (noeud) => !noeud.enfants;
+
+// réduire : un nombre pour tout l'arbre
+const total = (n) => (estFeuille(n) ? valeur(n) : n.enfants.reduce((s, e) => s + total(e), 0));
+
+// aplatir : la liste de toutes les feuilles
+const feuilles = (n) => (estFeuille(n) ? [n] : n.enfants.flatMap(feuilles));
+```
+
+## Pièges
+
+- Oublier le cas de base : `RangeError: Maximum call stack size exceeded`.
+- Ne pas réduire le problème à chaque appel : même erreur.
+
+=== exemple
+// Récursion : un cas de base, et un appel sur un problème plus petit.
+
+const somme = (nombres) => (nombres.length === 0 ? 0 : nombres[0] + somme(nombres.slice(1)));
+console.log(somme([7, 14, 6]));
+
+// Sur un arbre : une rubrique contient des plats ou d'autres rubriques.
+const carte = {
+  nom: 'Carte',
+  enfants: [
+    { nom: 'Soupe', prix: 7 },
+    { nom: 'Plats', enfants: [{ nom: 'Burger', prix: 14 }, { nom: 'Risotto', prix: 13 }] },
+  ],
+};
+
+const compter = (noeud) =>
+  !noeud.enfants ? 1 : noeud.enfants.reduce((total, enfant) => total + compter(enfant), 0);
+
+console.log('nombre de plats :', compter(carte));
+
+=== consigne
+## Défi : explorer la carte
+
+La carte est un arbre. Un **plat** ressemble à `{ nom, prix }`. Une **rubrique** ressemble à `{ nom, enfants: [...] }` et peut contenir des plats ou d'autres rubriques, sur n'importe quelle profondeur.
+
+Écris trois fonctions **récursives** :
+
+1. `compterPlats(noeud)` renvoie le nombre de plats.
+2. `totalCarte(noeud)` renvoie la somme des prix de tous les plats.
+3. `nomsDesPlats(noeud)` renvoie la liste à plat des noms de plats, dans l'ordre de la carte.
+
+Une rubrique vide vaut `0` plat, `0` euro et `[]`.
+
+**Règle :** pas de boucle `for` ni `while`.
+
+=== depart
+// Quête 19 — La carte gigogne
+
+// Un nœud sans « enfants » est un plat.
+const estPlat = (noeud) => !noeud.enfants;
+
+const compterPlats = (noeud) => {
+  // TODO : cas de base (un plat), cas récursif (une rubrique)
+};
+
+const totalCarte = (noeud) => {
+  // TODO
+};
+
+const nomsDesPlats = (noeud) => {
+  // TODO
+};
+
+module.exports = { compterPlats, totalCarte, nomsDesPlats };
+
+=== solution
+// Quête 19 — La carte gigogne
+
+const estPlat = (noeud) => !noeud.enfants;
+
+const compterPlats = (noeud) =>
+  estPlat(noeud) ? 1 : noeud.enfants.reduce((total, enfant) => total + compterPlats(enfant), 0);
+
+const totalCarte = (noeud) =>
+  estPlat(noeud) ? noeud.prix : noeud.enfants.reduce((total, enfant) => total + totalCarte(enfant), 0);
+
+const nomsDesPlats = (noeud) => (estPlat(noeud) ? [noeud.nom] : noeud.enfants.flatMap(nomsDesPlats));
+
+module.exports = { compterPlats, totalCarte, nomsDesPlats };
+
+=== indices
+Chaque fonction commence par `estPlat(noeud) ? casDeBase : casRecursif`. Pour `compterPlats`, le cas de base vaut `1`.
+---
+Cas récursif : `noeud.enfants.reduce((total, enfant) => total + compterPlats(enfant), 0)`. La fonction s'appelle elle-même sur chaque enfant.
+---
+`nomsDesPlats` : le cas de base renvoie `[noeud.nom]`, le cas récursif `noeud.enfants.flatMap(nomsDesPlats)`.
+
+=== tests
+interdit(/\b(for|while)\b/, 'pas de boucle for ni while');
+const CARTE = () => ({
+  nom: 'Carte',
+  enfants: [
+    { nom: 'Entrées', enfants: [{ nom: 'Soupe', prix: 7 }, { nom: 'Salade', prix: 9 }] },
+    { nom: 'Plats', enfants: [
+      { nom: 'Burger', prix: 14 },
+      { nom: 'Végétariens', enfants: [{ nom: 'Risotto', prix: 13 }] },
+    ] },
+    { nom: 'Tiramisu', prix: 6 },
+  ],
+});
+test('compterPlats compte un plat seul', (m, t) => t.egal(m.compterPlats({ nom: 'Soupe', prix: 7 }), 1));
+test('compterPlats parcourt toute la profondeur', (m, t) => t.egal(t.sansMutation(CARTE(), (c) => m.compterPlats(c)), 5));
+test('totalCarte additionne tous les prix', (m, t) => t.egal(m.totalCarte(CARTE()), 49));
+test('nomsDesPlats renvoie les noms à plat, dans l\'ordre', (m, t) =>
+  t.egal(t.sansMutation(CARTE(), (c) => m.nomsDesPlats(c)), ['Soupe', 'Salade', 'Burger', 'Risotto', 'Tiramisu']));
+test('une rubrique vide vaut 0 plat, 0 euro et []', (m, t) => {
+  const vide = { nom: 'Suggestions', enfants: [] };
+  t.egal(m.compterPlats(vide), 0);
+  t.egal(m.totalCarte(vide), 0);
+  t.egal(m.nomsDesPlats(vide), []);
+});

@@ -1,0 +1,191 @@
+@chapitre 5 · Le coup de feu
+@titre Le carnet du chef
+@notion Mémoïsation : mettre en cache une fonction pure
+@xp 200
+@retenir une fonction pure donne toujours le même résultat pour les mêmes arguments : on peut donc le noter une fois et le relire ensuite.
+
+=== cours
+## La mémoïsation
+
+> 🍽 Le chef a calculé une fois le coût de revient du homard. Il le note dans son carnet. La prochaine fois qu'on lui pose la question, il **lit** la réponse au lieu de tout recalculer.
+
+Puisqu'une fonction **pure** renvoie toujours le même résultat pour les mêmes arguments, on peut **mémoriser** ce résultat. C'est la récompense concrète de la pureté : une optimisation sûre, sans changer le comportement.
+
+## Le principe
+
+`memoiser(fn)` renvoie une nouvelle fonction qui :
+
+1. regarde si le résultat pour ces arguments est déjà dans le cache ;
+2. si oui, le renvoie sans appeler `fn` ;
+3. sinon, appelle `fn`, range le résultat, puis le renvoie.
+
+## Les outils nécessaires
+
+**Une closure** : le cache vit dans la fonction extérieure, et la fonction renvoyée s'en souvient (quête 11).
+
+**Une `Map`** : un dictionnaire clé/valeur.
+
+```js
+const cache = new Map();
+cache.set('cle', 42);
+cache.has('cle'); // true
+cache.get('cle'); // 42
+```
+
+**Une clé** : pour gérer plusieurs arguments, on les transforme en texte.
+
+```js
+const cle = JSON.stringify(args); // [1, 2] devient '[1,2]'
+```
+
+## Le piège du résultat « faux »
+
+Ne teste pas la présence avec `if (cache.get(cle))` : un résultat qui vaut `0`, `''` ou `false` serait recalculé à chaque fois. Utilise `cache.has(cle)`.
+
+## Et la pureté du cache ?
+
+Le cache est modifié, c'est donc une mutation. Mais elle est **enfermée** dans la closure : vue de l'extérieur, la fonction mémoïsée reste pure. Un effet de bord maîtrisé et invisible est acceptable.
+
+Ne mémoïse jamais une fonction impure : elle renverrait un résultat périmé.
+
+=== doc
+## Map
+
+```js
+const m = new Map();
+m.set(cle, valeur);
+m.has(cle);   // true / false
+m.get(cle);   // la valeur, ou undefined
+m.size;       // nombre d'entrées
+```
+
+## Squelette
+
+```js
+const memoiser = (fn) => {
+  const cache = new Map();
+  return (...args) => {
+    // construire la clé, consulter le cache, sinon calculer et ranger
+  };
+};
+```
+
+## Clé pour plusieurs arguments
+
+```js
+JSON.stringify([1, 2])   // '[1,2]'
+JSON.stringify(['a'])    // '["a"]'
+```
+
+## Quand mémoïser
+
+- La fonction est **pure**.
+- Le calcul est **coûteux**.
+- Les mêmes arguments **reviennent souvent**.
+
+=== exemple
+// Mémoïsation à la main, pour voir le cache travailler.
+
+const coutDeRevient = (plat) => {
+  console.log(`  ... calcul long pour ${plat}`);
+  return plat.length * 2;
+};
+
+const cache = new Map();
+const coutAvecCache = (plat) => {
+  if (!cache.has(plat)) cache.set(plat, coutDeRevient(plat));
+  return cache.get(plat);
+};
+
+console.log(coutAvecCache('homard')); // calcule
+console.log(coutAvecCache('homard')); // lit le carnet
+console.log(coutAvecCache('risotto')); // calcule
+console.log('entrées dans le cache :', cache.size);
+
+=== consigne
+## Défi : écrire memoiser
+
+Écris `memoiser(fn)` : elle renvoie une version de `fn` qui garde ses résultats en mémoire.
+
+- Appelée deux fois avec les **mêmes arguments**, elle n'exécute `fn` qu'**une seule fois**.
+- Elle fonctionne avec **plusieurs arguments** : `(1, 2)` et `(2, 1)` sont deux appels différents.
+- Un résultat qui vaut `0` doit lui aussi être mis en cache.
+- Deux fonctions mémoïsées séparément ont chacune **leur propre cache**.
+
+=== depart
+// Quête 21 — Le carnet du chef
+
+const memoiser = (fn) => {
+  // TODO : créer le cache ici (il sera capturé par la closure)
+
+  return (...args) => {
+    // TODO : clé → cache.has ? → sinon calculer et ranger → renvoyer
+  };
+};
+
+module.exports = { memoiser };
+
+=== solution
+// Quête 21 — Le carnet du chef
+
+const memoiser = (fn) => {
+  const cache = new Map();
+  return (...args) => {
+    const cle = JSON.stringify(args);
+    if (!cache.has(cle)) cache.set(cle, fn(...args));
+    return cache.get(cle);
+  };
+};
+
+module.exports = { memoiser };
+
+=== indices
+Crée `const cache = new Map();` avant le `return`, puis dans la fonction renvoyée construis la clé avec `JSON.stringify(args)`.
+---
+`if (!cache.has(cle)) cache.set(cle, fn(...args));` puis `return cache.get(cle);`
+---
+Si le cache est créé en dehors de `memoiser`, toutes les fonctions mémoïsées le partagent : il doit être déclaré **à l'intérieur** de `memoiser`, et testé avec `has` plutôt qu'avec `get`.
+
+=== tests
+const espion = (fn) => {
+  const s = (...args) => {
+    s.appels++;
+    return fn(...args);
+  };
+  s.appels = 0;
+  return s;
+};
+test('memoiser renvoie une fonction qui donne le même résultat', (m, t) => {
+  const f = m.memoiser((n) => n * 2);
+  t.vrai(typeof f === 'function', 'memoiser(fn) doit renvoyer une fonction.');
+  t.egal(f(21), 42);
+});
+test('la fonction d\'origine n\'est appelée qu\'une fois pour un même argument', (m, t) => {
+  const s = espion((n) => n * 2);
+  const f = m.memoiser(s);
+  t.egal([f(5), f(5), f(5)], [10, 10, 10]);
+  t.egal(s.appels, 1, 'Nombre d\'appels à la fonction d\'origine pour f(5), f(5), f(5) :');
+});
+test('un argument différent déclenche un nouveau calcul', (m, t) => {
+  const s = espion((n) => n * 2);
+  const f = m.memoiser(s);
+  t.egal([f(1), f(2), f(1)], [2, 4, 2]);
+  t.egal(s.appels, 2, 'Nombre d\'appels pour f(1), f(2), f(1) :');
+});
+test('fonctionne avec plusieurs arguments : (1, 2) et (2, 1) sont distincts', (m, t) => {
+  const s = espion((a, b) => a - b);
+  const f = m.memoiser(s);
+  t.egal([f(1, 2), f(2, 1), f(1, 2)], [-1, 1, -1]);
+  t.egal(s.appels, 2, 'Nombre d\'appels pour f(1, 2), f(2, 1), f(1, 2) :');
+});
+test('un résultat égal à 0 est lui aussi mis en cache', (m, t) => {
+  const s = espion(() => 0);
+  const f = m.memoiser(s);
+  t.egal([f('x'), f('x')], [0, 0]);
+  t.egal(s.appels, 1, 'Utilise cache.has(cle) plutôt que de tester la valeur. Nombre d\'appels :');
+});
+test('chaque fonction mémoïsée possède son propre cache', (m, t) => {
+  const double = m.memoiser((n) => n * 2);
+  const triple = m.memoiser((n) => n * 3);
+  t.egal([double(5), triple(5)], [10, 15], 'Les deux fonctions partagent le même cache.');
+});

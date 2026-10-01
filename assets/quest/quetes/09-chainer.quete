@@ -1,0 +1,165 @@
+@chapitre 2 · À la chaîne
+@titre Le travail à la chaîne
+@notion Chaîner filter, map et reduce
+@xp 80
+@retenir filter, map et reduce s'enchaînent : chaque étape reçoit le tableau produit par la précédente. Une étape, une idée.
+
+=== cours
+## Enchaîner les étapes
+
+> 🍽 Une brigade travaille à la chaîne : un poste trie, le suivant cuit, le dernier dresse. Chacun reçoit ce que le précédent a préparé.
+
+Comme `filter` et `map` renvoient un tableau, on peut appeler la méthode suivante directement sur le résultat.
+
+```js
+const totalVegetarien = menu
+  .filter((plat) => plat.vegetarien)       // 1. garder les végétariens
+  .map((plat) => plat.prix)                // 2. ne garder que les prix
+  .reduce((somme, prix) => somme + prix, 0); // 3. additionner
+```
+
+On lit le pipeline de haut en bas, comme une recette. Chaque ligne exprime **une seule idée**.
+
+## L'ordre habituel
+
+1. `filter` d'abord : on réduit la quantité de données à traiter.
+2. `map` ensuite : on met les données en forme.
+3. `reduce` à la fin : on résume.
+
+## Nommer les étapes
+
+Quand une étape devient compliquée, sors-la dans une petite fonction nommée :
+
+```js
+const totalCommande = (commande) => commande.plats.reduce((s, p) => s + p.prix, 0);
+
+const totaux = commandes.map(totalCommande);
+```
+
+Remarque : on passe `totalCommande` **sans parenthèses**. C'est la fonction elle-même qu'on confie à `map`.
+
+## Calculer une moyenne
+
+Une moyenne est une somme divisée par un nombre d'éléments. Attention à la division par zéro quand le tableau est vide.
+
+=== doc
+## Pipeline type
+
+```js
+donnees
+  .filter(garder)
+  .map(transformer)
+  .reduce(resumer, depart)
+```
+
+## Passer une fonction nommée
+
+```js
+const estVegetarien = (plat) => plat.vegetarien;
+const prixDe = (plat) => plat.prix;
+
+menu.filter(estVegetarien).map(prixDe);
+```
+
+## Moyenne sans division par zéro
+
+```js
+const moyenne = (nombres) =>
+  nombres.length === 0 ? 0 : nombres.reduce((a, b) => a + b, 0) / nombres.length;
+```
+
+## L'opérateur ternaire
+
+`condition ? siVrai : siFaux` est une **expression** : elle produit une valeur, à la différence de `if`.
+
+=== exemple
+// Un pipeline : chaque étape reçoit le résultat de la précédente.
+
+const menu = [
+  { nom: 'Salade César', prix: 9, categorie: 'entrée', vegetarien: false },
+  { nom: 'Soupe', prix: 7, categorie: 'entrée', vegetarien: true },
+  { nom: 'Risotto', prix: 13, categorie: 'plat', vegetarien: true },
+  { nom: 'Tiramisu', prix: 6, categorie: 'dessert', vegetarien: true },
+];
+
+const vegetariens = menu.filter((plat) => plat.vegetarien);
+console.log('1. filter :', vegetariens.length, 'plats');
+
+const prix = vegetariens.map((plat) => plat.prix);
+console.log('2. map    :', prix);
+
+console.log('3. reduce :', prix.reduce((somme, p) => somme + p, 0));
+
+// La même chose en une seule chaîne :
+console.log(menu.filter((p) => p.vegetarien).map((p) => p.prix).reduce((s, p) => s + p, 0));
+
+=== consigne
+## Défi : les statistiques du service
+
+1. `nomsVegetariens(menu)` renvoie les **noms** des plats végétariens.
+2. `totalParCategorie(menu, categorie)` renvoie la **somme des prix** des plats de cette catégorie (`0` s'il n'y en a aucun).
+3. `ticketMoyen(commandes)` : chaque commande ressemble à `{ client, plats: [{ nom, prix }] }`. Renvoie la **moyenne** des totaux des commandes, et `0` s'il n'y a aucune commande.
+
+**Règle :** pas de boucle `for`, `while` ni `forEach`.
+
+=== depart
+// Quête 9 — Le travail à la chaîne
+
+const nomsVegetariens = (menu) => {
+  // TODO : filter puis map
+};
+
+const totalParCategorie = (menu, categorie) => {
+  // TODO : filter puis reduce
+};
+
+const ticketMoyen = (commandes) => {
+  // TODO : total de chaque commande, puis moyenne
+};
+
+module.exports = { nomsVegetariens, totalParCategorie, ticketMoyen };
+
+=== solution
+// Quête 9 — Le travail à la chaîne
+
+const nomsVegetariens = (menu) => menu.filter((plat) => plat.vegetarien).map((plat) => plat.nom);
+
+const totalParCategorie = (menu, categorie) =>
+  menu.filter((plat) => plat.categorie === categorie).reduce((somme, plat) => somme + plat.prix, 0);
+
+const totalCommande = (commande) => commande.plats.reduce((somme, plat) => somme + plat.prix, 0);
+
+const ticketMoyen = (commandes) =>
+  commandes.length === 0 ? 0 : commandes.map(totalCommande).reduce((a, b) => a + b, 0) / commandes.length;
+
+module.exports = { nomsVegetariens, totalParCategorie, ticketMoyen };
+
+=== indices
+Enchaîne les méthodes avec un point : `menu.filter(...).map(...)`.
+---
+Pour `ticketMoyen`, écris d'abord une petite fonction `totalCommande(commande)` qui additionne les prix de `commande.plats`, puis utilise `commandes.map(totalCommande)`.
+---
+Moyenne : `commandes.length === 0 ? 0 : somme des totaux / commandes.length`. La somme des totaux s'obtient avec `.reduce((a, b) => a + b, 0)`.
+
+=== tests
+const MENU = () => [
+  { nom: 'Salade César', prix: 9, categorie: 'entrée', vegetarien: false },
+  { nom: 'Soupe', prix: 7, categorie: 'entrée', vegetarien: true },
+  { nom: 'Burger', prix: 14, categorie: 'plat', vegetarien: false },
+  { nom: 'Risotto', prix: 13, categorie: 'plat', vegetarien: true },
+  { nom: 'Tiramisu', prix: 6, categorie: 'dessert', vegetarien: true },
+];
+const COMMANDES = () => [
+  { client: 'Alice', plats: [{ nom: 'Salade César', prix: 9 }, { nom: 'Burger', prix: 14 }] },
+  { client: 'Karim', plats: [{ nom: 'Risotto', prix: 13 }] },
+  { client: 'Lina', plats: [{ nom: 'Tiramisu', prix: 6 }, { nom: 'Tiramisu', prix: 6 }] },
+];
+interdit(/\b(for|while)\b|\.forEach\(/, 'pas de boucle for, while ni forEach');
+test('nomsVegetariens renvoie les noms des plats végétariens', (m, t) =>
+  t.egal(t.sansMutation(MENU(), (menu) => m.nomsVegetariens(menu)), ['Soupe', 'Risotto', 'Tiramisu']));
+test("totalParCategorie(menu, 'plat') renvoie 27", (m, t) => t.egal(m.totalParCategorie(MENU(), 'plat'), 27));
+test("totalParCategorie(menu, 'entrée') renvoie 16", (m, t) => t.egal(m.totalParCategorie(MENU(), 'entrée'), 16));
+test('totalParCategorie vaut 0 pour une catégorie absente', (m, t) => t.egal(m.totalParCategorie(MENU(), 'boisson'), 0));
+test('ticketMoyen renvoie la moyenne des totaux (23, 13 et 12 donnent 16)', (m, t) =>
+  t.proche(t.sansMutation(COMMANDES(), (c) => m.ticketMoyen(c)), 16));
+test('ticketMoyen sans commande vaut 0', (m, t) => t.egal(m.ticketMoyen([]), 0, 'Attention à la division par zéro.'));

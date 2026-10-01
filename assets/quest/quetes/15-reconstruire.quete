@@ -1,0 +1,142 @@
+@chapitre 3 · La fabrique à fonctions
+@titre Forger ses propres couteaux
+@notion Réécrire map et filter avec reduce
+@xp 120
+@retenir map et filter ne sont que des cas particuliers de reduce : un accumulateur tableau qu'on reconstruit sans le muter.
+
+=== cours
+## Sous le capot de map et filter
+
+> 🍽 Un cuisinier qui a forgé son propre couteau sait exactement comment il coupe. Pour maîtriser `map` et `filter`, rien de tel que de les reconstruire.
+
+`reduce` peut accumuler **n'importe quoi**, y compris un tableau. On part d'un tableau vide `[]` et on y ajoute des éléments à chaque tour, sans mutation, grâce au spread.
+
+## map, vu comme un reduce
+
+Pour chaque élément, on ajoute sa version **transformée** :
+
+```js
+const doubles = [1, 2, 3].reduce((acc, n) => [...acc, n * 2], []);
+// [2, 4, 6]
+```
+
+## filter, vu comme un reduce
+
+Pour chaque élément, on l'ajoute **seulement s'il passe le test**. Sinon, on renvoie l'accumulateur tel quel :
+
+```js
+const pairs = [1, 2, 3, 4].reduce((acc, n) => (n % 2 === 0 ? [...acc, n] : acc), []);
+// [2, 4]
+```
+
+## Ce que ça révèle
+
+`map` et `filter` sont des **raccourcis** : des `reduce` spécialisés pour deux usages très fréquents. Comprendre cela, c'est comprendre qu'on peut inventer ses propres outils quand ceux du langage ne suffisent pas. C'est exactement ce que tu feras au chapitre suivant avec le regroupement.
+
+## Généraliser
+
+En remplaçant `n * 2` par un appel à une fonction reçue en paramètre, on obtient un outil réutilisable :
+
+```js
+const monMap = (tableau, fn) => tableau.reduce((acc, element) => [...acc, fn(element)], []);
+```
+
+=== doc
+## Accumuler un tableau
+
+```js
+t.reduce((acc, e) => [...acc, e], [])              // copie
+t.reduce((acc, e) => [...acc, fn(e)], [])          // map
+t.reduce((acc, e) => (test(e) ? [...acc, e] : acc), []) // filter
+```
+
+## Accumuler un nombre
+
+```js
+t.reduce((n, e) => (test(e) ? n + 1 : n), 0) // compter ce qui passe un test
+```
+
+## Point d'attention
+
+Dans la branche « on ne garde pas », il faut renvoyer `acc`. Oublier ce retour donne `undefined` au tour suivant.
+
+=== exemple
+// map et filter reconstruits avec reduce.
+
+const nombres = [1, 2, 3, 4];
+
+const doubles = nombres.reduce((acc, n) => [...acc, n * 2], []);
+console.log('map    :', doubles);
+
+const pairs = nombres.reduce((acc, n) => (n % 2 === 0 ? [...acc, n] : acc), []);
+console.log('filter :', pairs);
+
+const combien = nombres.reduce((total, n) => (n > 2 ? total + 1 : total), 0);
+console.log('compter :', combien);
+
+=== consigne
+## Défi : forger tes outils
+
+Réécris trois outils en utilisant **uniquement `reduce`** :
+
+1. `monMap(tableau, fn)` se comporte comme `tableau.map(fn)`.
+2. `monFilter(tableau, predicat)` se comporte comme `tableau.filter(predicat)`.
+3. `compter(tableau, predicat)` renvoie le **nombre** d'éléments qui passent le test.
+
+**Règles :** `.map(`, `.filter(`, les boucles et `push` sont interdits. Le tableau reçu ne doit pas être modifié.
+
+=== depart
+// Quête 15 — Forger ses propres couteaux
+
+const monMap = (tableau, fn) => {
+  // TODO : avec reduce, en partant de []
+};
+
+const monFilter = (tableau, predicat) => {
+  // TODO : avec reduce, en partant de []
+};
+
+const compter = (tableau, predicat) => {
+  // TODO : avec reduce, en partant de 0
+};
+
+module.exports = { monMap, monFilter, compter };
+
+=== solution
+// Quête 15 — Forger ses propres couteaux
+
+const monMap = (tableau, fn) => tableau.reduce((acc, element) => [...acc, fn(element)], []);
+
+const monFilter = (tableau, predicat) =>
+  tableau.reduce((acc, element) => (predicat(element) ? [...acc, element] : acc), []);
+
+const compter = (tableau, predicat) => tableau.reduce((total, element) => (predicat(element) ? total + 1 : total), 0);
+
+module.exports = { monMap, monFilter, compter };
+
+=== indices
+Les trois fonctions commencent par `tableau.reduce((acc, element) => ..., depart)`. Le départ vaut `[]` pour les deux premières et `0` pour la troisième.
+---
+`monMap` : à chaque tour, renvoie `[...acc, fn(element)]`.
+---
+`monFilter` : `predicat(element) ? [...acc, element] : acc`. `compter` : `predicat(element) ? total + 1 : total`.
+
+=== tests
+requis(/\.reduce\(/, 'utiliser reduce');
+interdit(/\.(map|filter)\(/, 'pas de .map( ni de .filter(');
+interdit(/\b(for|while)\b|\.forEach\(|\.push\(/, 'pas de boucle ni de push');
+const MENU = () => [
+  { nom: 'Soupe', prix: 7 },
+  { nom: 'Burger', prix: 14 },
+  { nom: 'Tiramisu', prix: 6 },
+];
+test('monMap transforme chaque élément', (m, t) => t.egal(m.monMap([1, 2, 3], (n) => n * 2), [2, 4, 6]));
+test('monMap fonctionne avec des objets et ne modifie rien', (m, t) =>
+  t.egal(t.sansMutation(MENU(), (menu) => m.monMap(menu, (p) => p.nom)), ['Soupe', 'Burger', 'Tiramisu']));
+test('monMap sur un tableau vide renvoie []', (m, t) => t.egal(m.monMap([], (n) => n), []));
+test('monFilter garde ce qui passe le test', (m, t) => t.egal(m.monFilter([1, 2, 3, 4], (n) => n % 2 === 0), [2, 4]));
+test('monFilter renvoie [] si rien ne passe', (m, t) => t.egal(m.monFilter(MENU(), (p) => p.prix > 100), []));
+test('compter renvoie le nombre d\'éléments qui passent le test', (m, t) => {
+  t.egal(m.compter(MENU(), (p) => p.prix < 10), 2);
+  t.egal(m.compter([], (p) => true), 0);
+});

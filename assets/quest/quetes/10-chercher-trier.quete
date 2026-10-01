@@ -1,0 +1,165 @@
+@chapitre 2 · À la chaîne
+@titre L'inventaire
+@notion find, some, every et le tri sans mutation
+@xp 80
+@retenir find cherche un élément, some et every répondent par vrai ou faux. sort modifie le tableau : trie toujours une copie.
+
+=== cours
+## Poser une question à un tableau
+
+> 🍽 Avant le service, le chef fait l'inventaire : « Où est le homard ? Reste-t-il au moins un dessert ? Tout est-il frais ? »
+
+Trois méthodes prennent un prédicat, comme `filter`, mais répondent autrement.
+
+**`find` : le premier élément qui convient**
+
+```js
+menu.find((plat) => plat.nom === 'Burger'); // l'objet Burger
+menu.find((plat) => plat.nom === 'Pizza');  // undefined
+```
+
+**`some` : y en a-t-il au moins un ?**
+
+```js
+menu.some((plat) => plat.prix > 30); // false
+```
+
+**`every` : est-ce vrai pour tous ?**
+
+```js
+menu.every((plat) => plat.disponible); // true ou false
+```
+
+Sur un tableau vide, `every` répond `true` et `some` répond `false`.
+
+## includes
+
+Pour savoir si un tableau contient une valeur simple :
+
+```js
+['gluten', 'lait'].includes('lait'); // true
+```
+
+## Le piège de sort
+
+`sort` **modifie le tableau d'origine**. C'est l'une des rares méthodes de tableau à le faire, et elle surprend tout le monde.
+
+```js
+const tries = [...menu].sort((a, b) => a.prix - b.prix);
+```
+
+On trie donc une **copie** obtenue avec le spread. La fonction de comparaison `(a, b) => a.prix - b.prix` donne un tri croissant ; inverse `a` et `b` pour un tri décroissant.
+
+=== doc
+## Chercher
+
+```js
+t.find((e) => condition)      // le premier élément, ou undefined
+t.findIndex((e) => condition) // sa position, ou -1
+t.some((e) => condition)      // true si au moins un
+t.every((e) => condition)     // true si tous
+t.includes(valeur)            // true si la valeur est présente
+```
+
+## Trier sans muter
+
+```js
+[...t].sort((a, b) => a - b)            // nombres croissants
+[...t].sort((a, b) => b - a)            // nombres décroissants
+[...t].sort((a, b) => a.prix - b.prix)  // objets, par prix
+t.toSorted((a, b) => a - b)             // Node 20+ : renvoie déjà une copie
+```
+
+Sans fonction de comparaison, `sort` trie comme du **texte** : `[10, 9].sort()` donne `[10, 9]`.
+
+=== exemple
+// Interroger un tableau, puis le trier sans le modifier.
+
+const menu = [
+  { nom: 'Burger', prix: 14, disponible: true },
+  { nom: 'Risotto', prix: 13, disponible: false },
+  { nom: 'Sorbet', prix: 5, disponible: true },
+];
+
+console.log('find  :', menu.find((plat) => plat.nom === 'Risotto'));
+console.log('find  :', menu.find((plat) => plat.nom === 'Pizza'));
+console.log('some  :', menu.some((plat) => plat.prix < 6));
+console.log('every :', menu.every((plat) => plat.disponible));
+
+const tries = [...menu].sort((a, b) => a.prix - b.prix);
+console.log('trié     :', tries.map((plat) => plat.nom));
+console.log('original :', menu.map((plat) => plat.nom));
+
+=== consigne
+## Défi : l'inventaire avant le service
+
+Chaque plat ressemble à `{ nom, prix, disponible, allergenes: ['gluten', ...] }`.
+
+1. `trouverPlat(menu, nom)` renvoie le plat qui porte ce nom, ou `undefined`.
+2. `toutEstDisponible(menu)` renvoie `true` si **tous** les plats sont disponibles.
+3. `contientAllergene(menu, allergene)` renvoie `true` si **au moins un** plat contient cet allergène.
+4. `trierParPrix(menu)` renvoie les plats du moins cher au plus cher, **sans modifier** le menu reçu.
+
+**Règle :** pas de boucle `for`, `while` ni `forEach`.
+
+=== depart
+// Quête 10 — L'inventaire
+
+const trouverPlat = (menu, nom) => {
+  // TODO
+};
+
+const toutEstDisponible = (menu) => {
+  // TODO
+};
+
+const contientAllergene = (menu, allergene) => {
+  // TODO
+};
+
+const trierParPrix = (menu) => {
+  // TODO : trier une copie
+};
+
+module.exports = { trouverPlat, toutEstDisponible, contientAllergene, trierParPrix };
+
+=== solution
+// Quête 10 — L'inventaire
+
+const trouverPlat = (menu, nom) => menu.find((plat) => plat.nom === nom);
+
+const toutEstDisponible = (menu) => menu.every((plat) => plat.disponible);
+
+const contientAllergene = (menu, allergene) => menu.some((plat) => plat.allergenes.includes(allergene));
+
+const trierParPrix = (menu) => [...menu].sort((a, b) => a.prix - b.prix);
+
+module.exports = { trouverPlat, toutEstDisponible, contientAllergene, trierParPrix };
+
+=== indices
+Une méthode par fonction : `find` pour chercher, `every` pour « tous », `some` pour « au moins un ».
+---
+Pour l'allergène, combine `some` et `includes` : `menu.some((plat) => plat.allergenes.includes(allergene))`.
+---
+Trier sans muter : `[...menu].sort((a, b) => a.prix - b.prix)`. Le spread crée la copie, `sort` la trie.
+
+=== tests
+const MENU = () => [
+  { nom: 'Salade César', prix: 9, disponible: true, allergenes: ['gluten', 'lait'] },
+  { nom: 'Burger', prix: 14, disponible: true, allergenes: ['gluten'] },
+  { nom: 'Risotto', prix: 13, disponible: false, allergenes: ['lait'] },
+  { nom: 'Sorbet', prix: 5, disponible: true, allergenes: [] },
+];
+interdit(/\b(for|while)\b|\.forEach\(/, 'pas de boucle for, while ni forEach');
+test('trouverPlat renvoie le plat demandé', (m, t) => t.egal(m.trouverPlat(MENU(), 'Burger'), MENU()[1]));
+test('trouverPlat renvoie undefined pour un plat absent', (m, t) => t.egal(m.trouverPlat(MENU(), 'Pizza'), undefined));
+test('toutEstDisponible est faux si un plat manque', (m, t) => t.egal(m.toutEstDisponible(MENU()), false));
+test('toutEstDisponible est vrai quand tout est disponible', (m, t) =>
+  t.egal(m.toutEstDisponible(MENU().filter((p) => p.nom !== 'Risotto')), true));
+test("contientAllergene détecte « lait » et pas « arachide »", (m, t) => {
+  t.egal(m.contientAllergene(MENU(), 'lait'), true);
+  t.egal(m.contientAllergene(MENU(), 'arachide'), false);
+});
+test('trierParPrix trie du moins cher au plus cher', (m, t) =>
+  t.egal(m.trierParPrix(MENU()).map((p) => p.nom), ['Sorbet', 'Salade César', 'Risotto', 'Burger']));
+test('trierParPrix ne modifie pas le menu reçu', (m, t) => t.sansMutation(MENU(), (menu) => m.trierParPrix(menu)));

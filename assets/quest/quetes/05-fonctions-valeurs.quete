@@ -1,0 +1,151 @@
+@chapitre 1 · La mise en place
+@titre Passe-moi la recette
+@notion Fonctions de première classe, callbacks
+@xp 50
+@retenir une fonction est une valeur comme une autre : on peut la ranger dans une variable, la passer en argument et la renvoyer.
+
+=== cours
+## Les fonctions sont des valeurs
+
+> 🍽 Le chef ne cuisine pas tout lui-même : il **tend une fiche recette** à un commis, qui l'exécute. La recette circule de main en main comme n'importe quel objet.
+
+En JavaScript, une fonction est une valeur, au même titre qu'un nombre ou un texte. On dit qu'elle est **de première classe**. On peut donc :
+
+**La ranger dans une variable**
+
+```js
+const doubler = (n) => n * 2;
+```
+
+**La passer en argument**
+
+```js
+const appliquer = (fn, valeur) => fn(valeur);
+
+appliquer(doubler, 5); // 10
+```
+
+Attention à la différence : `doubler` désigne la fonction (la fiche recette), `doubler(5)` l'**exécute** (le plat). Ici on transmet la fiche, sans parenthèses.
+
+**La renvoyer comme résultat**
+
+```js
+const choisirCuisson = (type) => {
+  if (type === 'saignant') return (minutes) => minutes - 2;
+  return (minutes) => minutes;
+};
+
+const ajuster = choisirCuisson('saignant');
+ajuster(10); // 8
+```
+
+## Fonction d'ordre supérieur
+
+Une fonction qui **reçoit** ou **renvoie** une autre fonction s'appelle une *fonction d'ordre supérieur*. C'est l'outil central du chapitre suivant : `map`, `filter` et `reduce` en sont toutes.
+
+Une fonction passée en argument s'appelle souvent un **callback**.
+
+=== doc
+## Trois usages d'une fonction-valeur
+
+```js
+const f = (x) => x + 1;          // dans une variable
+appliquer(f, 2);                 // en argument (sans parenthèses !)
+const creer = () => (x) => x;    // en valeur de retour
+```
+
+## f ou f() ?
+
+- `f` : la fonction elle-même.
+- `f(2)` : le résultat de son exécution.
+
+## Fonction anonyme
+
+On peut écrire la fonction directement à l'endroit où on la passe :
+
+```js
+appliquer((x) => x * 3, 4); // 12
+```
+
+=== exemple
+// Une fonction se transmet comme une valeur.
+
+const doubler = (n) => n * 2;
+const ajouterService = (prix) => prix + 2;
+
+const appliquer = (fn, valeur) => fn(valeur);
+
+console.log(appliquer(doubler, 5));          // 10
+console.log(appliquer(ajouterService, 12));  // 14
+console.log(appliquer((x) => x * 3, 4));     // fonction anonyme : 12
+
+// Une fonction qui renvoie une fonction :
+const choisirCuisson = (type) => (type === 'saignant' ? (min) => min - 2 : (min) => min);
+console.log(choisirCuisson('saignant')(10)); // 8
+
+=== consigne
+## Défi : les remises à la carte
+
+1. `appliquer(fn, valeur)` renvoie le résultat de `fn` appelée avec `valeur`.
+2. `appliquerDeuxFois(fn, valeur)` applique `fn`, puis applique `fn` de nouveau au résultat. `appliquerDeuxFois(doubler, 5)` renvoie `20`.
+3. `choisirRemise(type)` **renvoie une fonction** qui calcule le prix remisé :
+   - `'etudiant'` : 20 % de moins (`prix * 0.8`)
+   - `'fidele'` : 10 % de moins (`prix * 0.9`)
+   - tout autre type : le prix inchangé
+
+Exemple : `choisirRemise('etudiant')(100)` renvoie `80`.
+
+=== depart
+// Quête 5 — Passe-moi la recette
+
+const appliquer = (fn, valeur) => {
+  // TODO
+};
+
+const appliquerDeuxFois = (fn, valeur) => {
+  // TODO
+};
+
+// Doit RENVOYER une fonction (prix) => ...
+const choisirRemise = (type) => {
+  // TODO
+};
+
+module.exports = { appliquer, appliquerDeuxFois, choisirRemise };
+
+=== solution
+// Quête 5 — Passe-moi la recette
+
+const appliquer = (fn, valeur) => fn(valeur);
+
+const appliquerDeuxFois = (fn, valeur) => fn(fn(valeur));
+
+const choisirRemise = (type) => {
+  if (type === 'etudiant') return (prix) => prix * 0.8;
+  if (type === 'fidele') return (prix) => prix * 0.9;
+  return (prix) => prix;
+};
+
+module.exports = { appliquer, appliquerDeuxFois, choisirRemise };
+
+=== indices
+`fn` est une fonction reçue en paramètre : pour l'exécuter, écris `fn(valeur)`.
+---
+Appliquer deux fois : le résultat du premier appel devient l'argument du second, soit `fn(fn(valeur))`.
+---
+`choisirRemise` renvoie une fléchée : `if (type === 'etudiant') return (prix) => prix * 0.8;` et ainsi de suite, avec `return (prix) => prix;` à la fin.
+
+=== tests
+test('appliquer exécute la fonction reçue', (m, t) => {
+  t.egal(m.appliquer((x) => x + 1, 1), 2);
+  t.egal(m.appliquer((s) => s.toUpperCase(), 'chaud'), 'CHAUD');
+});
+test('appliquerDeuxFois(doubler, 5) renvoie 20', (m, t) => t.egal(m.appliquerDeuxFois((n) => n * 2, 5), 20));
+test('appliquerDeuxFois enchaîne bien les deux appels', (m, t) => t.egal(m.appliquerDeuxFois((s) => s + '!', 'Oui'), 'Oui!!'));
+test('choisirRemise renvoie une fonction', (m, t) => {
+  const r = m.choisirRemise('etudiant');
+  t.vrai(typeof r === 'function', `choisirRemise('etudiant') renvoie ${typeof r} au lieu d'une fonction.`);
+});
+test("choisirRemise('etudiant')(100) renvoie 80", (m, t) => t.proche(m.choisirRemise('etudiant')(100), 80));
+test("choisirRemise('fidele')(100) renvoie 90", (m, t) => t.proche(m.choisirRemise('fidele')(100), 90));
+test('un type inconnu laisse le prix inchangé', (m, t) => t.proche(m.choisirRemise('touriste')(100), 100));

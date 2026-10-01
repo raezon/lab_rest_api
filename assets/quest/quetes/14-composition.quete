@@ -1,0 +1,167 @@
+@chapitre 3 · La fabrique à fonctions
+@titre La chaîne de production
+@notion Composition : pipe et compose
+@xp 120
+@retenir composer, c'est brancher la sortie d'une fonction sur l'entrée de la suivante. pipe lit de gauche à droite, compose de droite à gauche.
+
+=== cours
+## Composer des fonctions
+
+> 🍽 Une assiette passe de poste en poste : cuisson, sauce, dressage. Chaque poste reçoit ce que le précédent a produit. La chaîne entière est elle-même une « super-recette ».
+
+Composer, c'est fabriquer **une nouvelle fonction** en branchant plusieurs petites fonctions bout à bout.
+
+```js
+const retirerRemise = (prix) => prix - 2;
+const ajouterTVA = (prix) => prix * 1.1;
+
+// à la main : on lit de l'intérieur vers l'extérieur
+ajouterTVA(retirerRemise(12)); // 11
+```
+
+Avec trois ou quatre fonctions, cette écriture imbriquée devient illisible.
+
+## pipe : de gauche à droite
+
+```js
+const prixClient = pipe(retirerRemise, ajouterTVA);
+
+prixClient(12); // 11
+```
+
+`pipe` renvoie une fonction. Quand on l'appelle, la valeur traverse chaque étape **dans l'ordre d'écriture**.
+
+## Écrire pipe avec reduce
+
+La valeur de départ est l'accumulateur ; chaque fonction le transforme.
+
+```js
+const pipe = (...fonctions) => (valeur) =>
+  fonctions.reduce((acc, fn) => fn(acc), valeur);
+```
+
+Ici, on réduit un **tableau de fonctions**. Sans aucune fonction, `pipe()` renvoie la valeur telle quelle.
+
+## compose : de droite à gauche
+
+`compose` fait la même chose dans l'ordre inverse, comme en mathématiques : `compose(f, g)(x)` vaut `f(g(x))`. Il suffit d'utiliser `reduceRight`.
+
+## La condition pour composer
+
+Chaque fonction doit prendre **un seul argument** et renvoyer une valeur. C'est là que le currying et les fabriques prennent tout leur sens : ils produisent des fonctions à un seul paramètre.
+
+=== doc
+## pipe et compose
+
+```js
+const pipe = (...fns) => (x) => fns.reduce((acc, fn) => fn(acc), x);
+const compose = (...fns) => (x) => fns.reduceRight((acc, fn) => fn(acc), x);
+
+pipe(f, g, h)(x);     // h(g(f(x)))
+compose(f, g, h)(x);  // f(g(h(x)))
+```
+
+## reduceRight
+
+Comme `reduce`, mais parcourt le tableau de la fin vers le début.
+
+## Composer avec des fabriques
+
+```js
+const retirer = (n) => (prix) => prix - n;
+const taxer = (taux) => (prix) => prix * (1 + taux);
+
+const prixClient = pipe(retirer(2), taxer(0.1));
+```
+
+## Arrondir à deux décimales
+
+```js
+const arrondir = (n) => Math.round(n * 100) / 100;
+```
+
+=== exemple
+// Composer : la sortie d'une fonction devient l'entrée de la suivante.
+
+const pipe = (...fonctions) => (valeur) => fonctions.reduce((acc, fn) => fn(acc), valeur);
+
+const retirerRemise = (prix) => prix - 2;
+const ajouterTVA = (prix) => prix * 1.1;
+const arrondir = (prix) => Math.round(prix * 100) / 100;
+const formater = (prix) => `${prix} €`;
+
+console.log(formater(arrondir(ajouterTVA(retirerRemise(12))))); // imbriqué : difficile à lire
+
+const etiquette = pipe(retirerRemise, ajouterTVA, arrondir, formater);
+console.log(etiquette(12));
+console.log([12, 22, 32].map(etiquette));
+
+=== consigne
+## Défi : assembler la chaîne
+
+Les fonctions `retirerRemise`, `ajouterTVA` et `arrondir` sont fournies.
+
+1. Écris `pipe(...fonctions)` : elle renvoie une fonction qui applique les fonctions **de gauche à droite**. `pipe()` sans argument renvoie la valeur inchangée.
+2. Écris `compose(...fonctions)` : même chose, **de droite à gauche**.
+3. Avec `pipe`, crée `prixClient` qui retire la remise, ajoute la TVA, puis arrondit.
+
+**Règle :** pas de boucle `for` ni `while`.
+
+=== depart
+// Quête 14 — La chaîne de production
+
+// Fournies : ne pas modifier.
+const retirerRemise = (prix) => prix - 2;
+const ajouterTVA = (prix) => prix * 1.1;
+const arrondir = (prix) => Math.round(prix * 100) / 100;
+
+// pipe(f, g)(x) → g(f(x))
+const pipe = (...fonctions) => {
+  // TODO
+};
+
+// compose(f, g)(x) → f(g(x))
+const compose = (...fonctions) => {
+  // TODO
+};
+
+// TODO : remplace undefined par un pipe des trois fonctions fournies
+const prixClient = undefined;
+
+module.exports = { pipe, compose, prixClient };
+
+=== solution
+// Quête 14 — La chaîne de production
+
+const retirerRemise = (prix) => prix - 2;
+const ajouterTVA = (prix) => prix * 1.1;
+const arrondir = (prix) => Math.round(prix * 100) / 100;
+
+const pipe = (...fonctions) => (valeur) => fonctions.reduce((acc, fn) => fn(acc), valeur);
+
+const compose = (...fonctions) => (valeur) => fonctions.reduceRight((acc, fn) => fn(acc), valeur);
+
+const prixClient = pipe(retirerRemise, ajouterTVA, arrondir);
+
+module.exports = { pipe, compose, prixClient };
+
+=== indices
+`pipe` renvoie une fonction `(valeur) => ...`. À l'intérieur, réduis le tableau `fonctions` en partant de `valeur`.
+---
+`fonctions.reduce((acc, fn) => fn(acc), valeur)` : à chaque tour, on applique la fonction courante à l'accumulateur.
+---
+`compose` est identique avec `reduceRight`. Et `const prixClient = pipe(retirerRemise, ajouterTVA, arrondir);`
+
+=== tests
+interdit(/\b(for|while)\b/, 'pas de boucle for ni while');
+const plusUn = (x) => x + 1;
+const double = (x) => x * 2;
+test('pipe applique de gauche à droite : pipe(plusUn, double)(3) renvoie 8', (m, t) => t.egal(m.pipe(plusUn, double)(3), 8));
+test('pipe accepte autant de fonctions que voulu', (m, t) => t.egal(m.pipe(plusUn, double, plusUn, String)(3), '9'));
+test('pipe() sans fonction renvoie la valeur inchangée', (m, t) => t.egal(m.pipe()(5), 5));
+test('compose applique de droite à gauche : compose(plusUn, double)(3) renvoie 7', (m, t) => t.egal(m.compose(plusUn, double)(3), 7));
+test('prixClient(12) renvoie 11', (m, t) => {
+  t.vrai(typeof m.prixClient === 'function', 'prixClient doit être une fonction : remplace undefined par un pipe.');
+  t.egal(m.prixClient(12), 11);
+});
+test('prixClient(21.99) renvoie 21.99 (arrondi à deux décimales)', (m, t) => t.egal(m.prixClient(21.99), 21.99));

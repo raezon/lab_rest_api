@@ -1,0 +1,178 @@
+@chapitre 4 · Le garde-manger
+@titre Le tableau des commandes
+@notion Mise à jour immuable de données imbriquées
+@xp 150
+@retenir pour modifier un élément au fond d'une structure, on recopie seulement le chemin qui y mène. Tout le reste est réutilisé tel quel.
+
+=== cours
+## Modifier en profondeur, sans rien abîmer
+
+> 🍽 Au passe, un tableau liste les commandes en cours. Quand un plat est prêt, on ne réécrit pas tout le tableau : on remplace **la fiche** concernée, et les autres restent accrochées où elles sont.
+
+Les quêtes 3 et 4 traitaient un tableau **ou** un objet. En pratique, les données sont imbriquées : un tableau d'objets qui contiennent des tableaux.
+
+## Modifier un élément d'une liste
+
+La recette : `map` pour parcourir, le spread pour copier **celui** qu'on change, et l'original pour les autres.
+
+```js
+const changerStatut = (commandes, id, statut) =>
+  commandes.map((commande) => (commande.id === id ? { ...commande, statut } : commande));
+```
+
+- La commande visée est remplacée par une **copie modifiée**.
+- Les autres sont renvoyées **telles quelles** : ce sont les mêmes objets, pas des copies.
+
+## Le partage de structure
+
+Réutiliser les éléments inchangés s'appelle le **partage de structure**. On ne copie que le chemin qui mène à la modification. C'est ce qui rend l'immutabilité économique, et c'est ce qui permet à une interface de savoir, d'un simple `===`, ce qui a changé.
+
+## Un niveau plus bas
+
+Pour modifier un plat **dans** une commande, on répète la recette à l'intérieur :
+
+```js
+commandes.map((commande) =>
+  commande.id !== id
+    ? commande
+    : { ...commande, plats: commande.plats.map((plat) => (plat.nom === nom ? { ...plat, pret: true } : plat)) }
+);
+```
+
+On copie la liste, la commande visée, sa liste de plats et le plat visé. Rien d'autre.
+
+=== doc
+## Dans un tableau d'objets
+
+```js
+// modifier un élément
+liste.map((e) => (e.id === id ? { ...e, champ: valeur } : e))
+
+// retirer un élément
+liste.filter((e) => e.id !== id)
+
+// ajouter un élément
+[...liste, nouveau]
+```
+
+## Dans un objet imbriqué
+
+```js
+{ ...commande, client: { ...commande.client, nom: 'Alice' } }
+```
+
+## Ajouter dans un tableau imbriqué
+
+```js
+{ ...commande, plats: [...commande.plats, plat] }
+```
+
+## Attention : le spread est superficiel
+
+`{ ...objet }` copie le premier niveau seulement. Les objets et tableaux intérieurs restent **partagés** : il faut les recopier explicitement quand on les modifie.
+
+=== exemple
+// Mettre à jour une commande dans la liste, sans toucher aux autres.
+
+const commandes = [
+  { id: 1, statut: 'en cours', plats: [{ nom: 'Burger', pret: false }] },
+  { id: 2, statut: 'en cours', plats: [{ nom: 'Soupe', pret: false }] },
+];
+
+const apres = commandes.map((c) => (c.id === 1 ? { ...c, statut: 'servie' } : c));
+
+console.log(apres);
+console.log('la commande 1 a été remplacée :', apres[0] !== commandes[0]);
+console.log('la commande 2 est réutilisée  :', apres[1] === commandes[1]);
+console.log('original intact :', commandes[0].statut);
+
+=== consigne
+## Défi : tenir le tableau des commandes
+
+Une commande ressemble à `{ id: 1, statut: 'en cours', plats: [{ nom: 'Burger', pret: false }] }`.
+
+1. `changerStatut(commandes, id, statut)` : la commande `id` reçoit le nouveau statut.
+2. `ajouterPlat(commandes, id, plat)` : le plat est ajouté à la fin des plats de la commande `id`.
+3. `marquerPret(commandes, id, nomPlat)` : dans la commande `id`, le plat `nomPlat` passe à `pret: true`.
+
+Chaque fonction renvoie une **nouvelle** liste. Les commandes non concernées doivent être **réutilisées telles quelles**, sans copie.
+
+**Règle :** pas de boucle, pas de `push`.
+
+=== depart
+// Quête 18 — Le tableau des commandes
+
+const changerStatut = (commandes, id, statut) => {
+  // TODO
+};
+
+const ajouterPlat = (commandes, id, plat) => {
+  // TODO
+};
+
+const marquerPret = (commandes, id, nomPlat) => {
+  // TODO
+};
+
+module.exports = { changerStatut, ajouterPlat, marquerPret };
+
+=== solution
+// Quête 18 — Le tableau des commandes
+
+// Applique fn à la commande visée et réutilise les autres telles quelles.
+const modifierCommande = (commandes, id, fn) => commandes.map((commande) => (commande.id === id ? fn(commande) : commande));
+
+const changerStatut = (commandes, id, statut) => modifierCommande(commandes, id, (commande) => ({ ...commande, statut }));
+
+const ajouterPlat = (commandes, id, plat) =>
+  modifierCommande(commandes, id, (commande) => ({ ...commande, plats: [...commande.plats, plat] }));
+
+const marquerPret = (commandes, id, nomPlat) =>
+  modifierCommande(commandes, id, (commande) => ({
+    ...commande,
+    plats: commande.plats.map((plat) => (plat.nom === nomPlat ? { ...plat, pret: true } : plat)),
+  }));
+
+module.exports = { changerStatut, ajouterPlat, marquerPret };
+
+=== indices
+Les trois fonctions suivent le même schéma : `commandes.map((c) => (c.id === id ? copieModifiee : c))`.
+---
+Pour ajouter un plat : `{ ...c, plats: [...c.plats, plat] }`.
+---
+Pour `marquerPret`, un second `map` à l'intérieur : `{ ...c, plats: c.plats.map((p) => (p.nom === nomPlat ? { ...p, pret: true } : p)) }`. Tu peux factoriser le schéma commun dans une fonction `modifierCommande(commandes, id, fn)`.
+
+=== tests
+interdit(/\b(for|while)\b|\.forEach\(|\.push\(/, 'pas de boucle ni de push');
+const COMMANDES = () => [
+  { id: 1, statut: 'en cours', plats: [{ nom: 'Burger', pret: false }, { nom: 'Soupe', pret: false }] },
+  { id: 2, statut: 'en cours', plats: [{ nom: 'Burger', pret: false }] },
+];
+test('changerStatut modifie la commande visée', (m, t) => {
+  const r = t.sansMutation(COMMANDES(), (c) => m.changerStatut(c, 2, 'servie'));
+  t.egal(r.map((c) => c.statut), ['en cours', 'servie']);
+});
+test('changerStatut réutilise les commandes non concernées', (m, t) => {
+  const commandes = COMMANDES();
+  const r = m.changerStatut(commandes, 2, 'servie');
+  t.vrai(r !== commandes, 'La liste renvoyée doit être une nouvelle liste.');
+  t.vrai(r[0] === commandes[0], 'La commande 1 n\'est pas concernée : renvoie-la telle quelle au lieu de la copier.');
+  t.vrai(r[1] !== commandes[1], 'La commande 2 doit être remplacée par une copie modifiée.');
+});
+test('ajouterPlat ajoute le plat à la bonne commande', (m, t) => {
+  const r = t.sansMutation(COMMANDES(), (c) => m.ajouterPlat(c, 2, { nom: 'Tiramisu', pret: false }));
+  t.egal(r[1].plats.map((p) => p.nom), ['Burger', 'Tiramisu']);
+  t.egal(r[0].plats.length, 2);
+});
+test('marquerPret ne touche que le plat demandé de la commande demandée', (m, t) => {
+  const r = t.sansMutation(COMMANDES(), (c) => m.marquerPret(c, 1, 'Burger'));
+  t.egal(r[0].plats, [{ nom: 'Burger', pret: true }, { nom: 'Soupe', pret: false }]);
+  t.egal(r[1].plats, [{ nom: 'Burger', pret: false }], 'Le Burger de la commande 2 ne doit pas changer.');
+});
+test('marquerPret réutilise ce qui n\'a pas changé', (m, t) => {
+  const commandes = COMMANDES();
+  const r = m.marquerPret(commandes, 1, 'Burger');
+  t.vrai(r[1] === commandes[1], 'La commande 2 doit être réutilisée telle quelle.');
+  t.vrai(r[0].plats[1] === commandes[0].plats[1], 'Le plat Soupe n\'a pas changé : réutilise-le tel quel.');
+});
+test('un identifiant inconnu ne change rien', (m, t) => t.egal(m.changerStatut(COMMANDES(), 99, 'servie'), COMMANDES()));

@@ -1,0 +1,151 @@
+@chapitre 2 · À la chaîne
+@titre L'addition, s'il vous plaît
+@notion reduce : ramener un tableau à une seule valeur
+@xp 80
+@retenir reduce parcourt le tableau en faisant évoluer un accumulateur. Donne toujours une valeur initiale.
+
+=== cours
+## reduce : tout ramener à une valeur
+
+> 🍽 À la caisse, le serveur prend les lignes de la commande une par une et tient un **total courant**. À la fin, il ne reste qu'un nombre : l'addition.
+
+`reduce` transforme un tableau entier en **une seule valeur**. Elle prend deux arguments :
+
+1. une fonction `(accumulateur, element) => nouvelAccumulateur`
+2. la **valeur initiale** de l'accumulateur
+
+```js
+const prix = [7, 14, 6];
+
+const total = prix.reduce((somme, p) => somme + p, 0); // 27
+```
+
+## Pas à pas
+
+- départ : `somme = 0`
+- `7` : `0 + 7` donne `7`
+- `14` : `7 + 14` donne `21`
+- `6` : `21 + 6` donne `27`
+
+À chaque tour, ce que la fonction **renvoie** devient l'accumulateur du tour suivant.
+
+## Toujours une valeur initiale
+
+Sans valeur initiale, `reduce` plante sur un tableau vide. Avec `0`, une commande vide donne simplement `0`.
+
+## L'accumulateur n'est pas forcément un nombre
+
+On peut garder « le meilleur jusqu'ici » :
+
+```js
+const plusLong = noms.reduce((meilleur, nom) => (nom.length > meilleur.length ? nom : meilleur), '');
+```
+
+L'accumulateur peut être un nombre, un texte, un objet ou un tableau. C'est ce qui fait de `reduce` l'outil le plus puissant des trois.
+
+=== doc
+## reduce
+
+```js
+tableau.reduce((acc, element) => nouvelAcc, valeurInitiale)
+```
+
+## Recettes classiques
+
+```js
+t.reduce((somme, n) => somme + n, 0)              // somme
+t.reduce((max, n) => (n > max ? n : max), -Infinity) // maximum
+t.reduce((n, x) => n + 1, 0)                      // compter
+```
+
+## Garder le meilleur objet
+
+```js
+plats.reduce((meilleur, plat) => (plat.prix > meilleur.prix ? plat : meilleur))
+```
+
+Ici, pas de valeur initiale : le premier élément sert de point de départ. C'est acceptable seulement si le tableau n'est jamais vide.
+
+## Erreur fréquente
+
+Oublier de **renvoyer** l'accumulateur : au tour suivant il vaut `undefined`.
+
+=== exemple
+// reduce fait évoluer un accumulateur, élément après élément.
+
+const commande = [
+  { nom: 'Soupe', prix: 7 },
+  { nom: 'Burger', prix: 14 },
+  { nom: 'Tiramisu', prix: 6 },
+];
+
+const total = commande.reduce((somme, plat) => {
+  console.log(`somme = ${somme}, on ajoute ${plat.nom} (${plat.prix})`);
+  return somme + plat.prix;
+}, 0);
+
+console.log('total :', total);
+console.log('commande vide :', [].reduce((somme, plat) => somme + plat.prix, 0));
+
+=== consigne
+## Défi : tenir la caisse
+
+Écris trois fonctions avec `reduce` :
+
+1. `total(commande)` renvoie la somme des `prix`. Une commande vide vaut `0`.
+2. `totalAvecQuantites(lignes)` : chaque ligne ressemble à `{ nom, prix, quantite }`. Renvoie la somme des `prix × quantite`.
+3. `plusCher(menu)` renvoie **le plat** (l'objet entier) dont le prix est le plus élevé.
+
+**Règles :** utilise `reduce`. Pas de boucle `for`, `while` ni `forEach`.
+
+=== depart
+// Quête 8 — L'addition, s'il vous plaît
+
+const total = (commande) => {
+  // TODO
+};
+
+const totalAvecQuantites = (lignes) => {
+  // TODO : somme des prix × quantite
+};
+
+const plusCher = (menu) => {
+  // TODO : le plat au prix le plus élevé
+};
+
+module.exports = { total, totalAvecQuantites, plusCher };
+
+=== solution
+// Quête 8 — L'addition, s'il vous plaît
+
+const total = (commande) => commande.reduce((somme, plat) => somme + plat.prix, 0);
+
+const totalAvecQuantites = (lignes) => lignes.reduce((somme, ligne) => somme + ligne.prix * ligne.quantite, 0);
+
+const plusCher = (menu) => menu.reduce((meilleur, plat) => (plat.prix > meilleur.prix ? plat : meilleur));
+
+module.exports = { total, totalAvecQuantites, plusCher };
+
+=== indices
+`commande.reduce((somme, plat) => somme + plat.prix, 0)` : le `0` final est la valeur de départ de `somme`.
+---
+Pour les quantités, ajoute `ligne.prix * ligne.quantite` à la somme à chaque tour.
+---
+`plusCher` : l'accumulateur est un plat. À chaque tour, garde le plat courant s'il est plus cher, sinon garde le meilleur : `(meilleur, plat) => (plat.prix > meilleur.prix ? plat : meilleur)`.
+
+=== tests
+const MENU = () => [
+  { nom: 'Soupe', prix: 7 },
+  { nom: 'Burger', prix: 14 },
+  { nom: 'Tiramisu', prix: 6 },
+];
+requis(/\.reduce\(/, 'utiliser reduce');
+interdit(/\b(for|while)\b|\.forEach\(/, 'pas de boucle for, while ni forEach');
+test('total additionne les prix', (m, t) => t.egal(m.total(MENU()), 27));
+test('total d\'une commande vide vaut 0', (m, t) => t.egal(m.total([]), 0, 'As-tu donné une valeur initiale à reduce ?'));
+test('totalAvecQuantites multiplie prix et quantité', (m, t) =>
+  t.egal(m.totalAvecQuantites([{ nom: 'Burger', prix: 14, quantite: 2 }, { nom: 'Tiramisu', prix: 6, quantite: 3 }]), 46));
+test('totalAvecQuantites sans ligne vaut 0', (m, t) => t.egal(m.totalAvecQuantites([]), 0));
+test('plusCher renvoie le plat le plus cher', (m, t) => t.egal(t.sansMutation(MENU(), (menu) => m.plusCher(menu)), { nom: 'Burger', prix: 14 }));
+test('plusCher fonctionne quand le plus cher est en dernier', (m, t) =>
+  t.egal(m.plusCher([{ nom: 'Soupe', prix: 7 }, { nom: 'Homard', prix: 38 }]), { nom: 'Homard', prix: 38 }));

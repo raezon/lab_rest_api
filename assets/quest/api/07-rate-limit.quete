@@ -1,0 +1,144 @@
+@notion Limitation de débit, 429, Retry-After
+@xp 120
+
+=== cours
+## Limiter le débit
+
+> 🚪 Le videur à l'entrée : cinq personnes par minute, les suivantes attendent dehors.
+
+Une API ouverte peut être appelée des milliers de fois par seconde : par un script mal écrit, ou par quelqu'un qui essaie tous les mots de passe possibles. La **limitation de débit** fixe un quota de requêtes par client.
+
+## L'algorithme de la fenêtre fixe
+
+Pour chaque client, on retient deux informations : **combien** de requêtes il a faites, et **depuis quand** on compte.
+
+1. À chaque requête, on regarde si la fenêtre de temps est écoulée. Si oui, on remet le compteur à zéro.
+2. On ajoute un au compteur.
+3. S'il dépasse le maximum, on refuse.
+
+## Identifier le client
+
+Sans authentification, on se base sur son adresse IP : `req.ip`. Une `Map` associe chaque IP à son compteur.
+
+```js
+const compteurs = new Map();
+
+const c = compteurs.get(req.ip) || { n: 0, debut: Date.now() };
+// … mise à jour …
+compteurs.set(req.ip, c);
+```
+
+## Où ranger la Map ?
+
+Dans la **fabrique**, hors du middleware. Si elle était créée dans le middleware, elle serait neuve à chaque requête et ne compterait jamais rien.
+
+```js
+function rateLimit({ windowMs, max }) {
+  const compteurs = new Map();      // créée une seule fois
+  return (req, res, next) => { … }; // s'en souvient (closure)
+}
+```
+
+## Refuser poliment
+
+Le code prévu est `429 Too Many Requests`. L'en-tête `Retry-After` indique au client **dans combien de secondes** réessayer.
+
+```js
+res.setHeader('Retry-After', secondes);
+res.status(429).json({ error: 'Trop de requêtes' });
+```
+
+## Informer avant de refuser
+
+Deux en-têtes préviennent le client de ce qui lui reste :
+
+- `X-RateLimit-Limit` : le quota
+- `X-RateLimit-Remaining` : le nombre de requêtes restantes
+
+## Choisir ce qu'on protège
+
+```js
+app.use('/api', rateLimit({ windowMs: 60_000, max: 5 }));
+```
+
+Monté sur `/api`, le middleware ne s'applique qu'aux routes sous ce préfixe. `/health` reste libre : la supervision doit toujours pouvoir l'appeler.
+
+=== doc
+## Squelette
+
+```js
+function rateLimit({ windowMs, max }) {
+  const compteurs = new Map();
+  return (req, res, next) => {
+    const maintenant = Date.now();
+    const c = compteurs.get(req.ip) || { n: 0, debut: maintenant };
+    // fenêtre écoulée ? → remise à zéro
+    // incrémenter, enregistrer, poser les en-têtes
+    // au-delà de max → 429 + Retry-After, sinon next()
+  };
+}
+```
+
+## Map
+
+```js
+m.get(cle)        // la valeur, ou undefined
+m.set(cle, valeur)
+```
+
+## Calculs utiles
+
+```js
+maintenant - c.debut > windowMs                        // fenêtre écoulée
+Math.max(0, max - c.n)                                 // requêtes restantes
+Math.ceil((c.debut + windowMs - maintenant) / 1000)    // secondes à attendre
+```
+
+## Tester
+
+Dans l'onglet **Requête**, clique six fois de suite sur `GET /api/ping` : le serveur garde ses compteurs tant que tu ne modifies pas le code.
+
+## En production
+
+On utilise `express-rate-limit` avec un stockage partagé (Redis), car chaque instance du serveur a sa propre mémoire.
+
+=== exemple
+// Exemple — la fenêtre fixe, sans serveur : 3 passages autorisés par seconde.
+const creerCompteur = ({ windowMs, max }) => {
+  const compteurs = new Map(); // créée une fois, conservée par la closure
+  return (client, maintenant) => {
+    const c = compteurs.get(client) || { n: 0, debut: maintenant };
+    if (maintenant - c.debut > windowMs) {
+      c.n = 0;
+      c.debut = maintenant;
+    }
+    c.n++;
+    compteurs.set(client, c);
+    return c.n <= max ? `accepté (${max - c.n} restant)` : 'REFUSÉ';
+  };
+};
+
+const passer = creerCompteur({ windowMs: 1000, max: 3 });
+
+// On simule l'horloge : les instants sont donnés en millisecondes.
+for (const instant of [0, 100, 200, 300, 400, 1200, 1300]) {
+  console.log(`t=${String(instant).padStart(4)} ms  Alice : ${passer('Alice', instant)}`);
+}
+console.log('t= 350 ms  Bob   :', passer('Bob', 350), '← chaque client a son propre compteur');
+
+=== requetes
+GET /api/ping
+GET /health
+
+=== indices
+La `Map` des compteurs se déclare dans `rateLimit`, avant le `return` : `const compteurs = new Map();`. Créée dans le middleware, elle serait vide à chaque requête.
+---
+Dans le middleware : `const maintenant = Date.now();`, puis `const c = compteurs.get(req.ip) || { n: 0, debut: maintenant };`.
+---
+Fenêtre écoulée : `if (maintenant - c.debut > windowMs) { c.n = 0; c.debut = maintenant; }`.
+---
+Compte la requête et enregistre : `c.n++;` puis `compteurs.set(req.ip, c);`.
+---
+En-têtes d'information, à poser sur toutes les réponses : `res.setHeader('X-RateLimit-Limit', max)` et `res.setHeader('X-RateLimit-Remaining', Math.max(0, max - c.n))`.
+---
+Dépassement : `if (c.n > max)`, pose `res.setHeader('Retry-After', Math.ceil((c.debut + windowMs - maintenant) / 1000))` et `return res.status(429).json({ error: 'Trop de requêtes' });`. Sinon, `next()`.

@@ -1,0 +1,122 @@
+@notion Procédural, orienté objet, fonctionnel
+@xp 60
+
+=== cours
+## Où vit la logique d'une API ?
+
+> 🍽 Même recette, trois cuisiniers : l'un suit la fiche ligne à ligne, l'autre dirige une brigade organisée, le dernier assemble des préparations toutes prêtes.
+
+Une API reçoit des requêtes, mais sa vraie valeur est dans ses **règles métier** : calculer un total, appliquer une taxe, valider une commande. Ces règles doivent vivre dans des fonctions **indépendantes des routes**, pour pouvoir les tester sans lancer de serveur.
+
+Il existe trois grandes façons d'écrire une même règle.
+
+## Procédural
+
+Une suite d'instructions qui modifient un état, pas à pas.
+
+```js
+let total = 0;
+for (const plat of plats) {
+  total = total + plat.prix;
+}
+```
+
+Simple à suivre, mais la variable `total` change à chaque tour.
+
+## Orienté objet
+
+Des objets qui regroupent les **données** et les **comportements**.
+
+```js
+class Panier {
+  constructor(plats) { this.plats = plats; }
+  ajouter(plat) { this.plats.push(plat); return this; }
+}
+```
+
+Renvoyer `this` permet de **chaîner** les appels : `panier.ajouter(a).ajouter(b)`.
+
+## Fonctionnel
+
+Des fonctions **pures** : elles ne modifient rien et donnent toujours le même résultat pour les mêmes entrées. On les compose avec `map` et `reduce`.
+
+```js
+const total = (plats) => plats.map((p) => p.prix).reduce((a, b) => a + b, 0);
+```
+
+- `map` transforme chaque élément ;
+- `reduce` ramène le tableau à une seule valeur, ici la somme, en partant de `0`.
+
+## Lequel choisir ?
+
+Les trois donnent le même résultat. Dans une API, le style fonctionnel est le plus simple à **tester** : une entrée, une sortie, aucun état caché. On utilisera ce réflexe dans toutes les étapes suivantes.
+
+=== doc
+## La règle du défi
+
+`total TTC = somme(prix × qte) × 1.2`, arrondi à 2 décimales. La fonction `arrondi` est fournie.
+
+## Boucle for
+
+```js
+let total = 0;
+for (const p of plats) total += p.prix * p.qte;
+```
+
+## Classe
+
+```js
+class Commande {
+  constructor(plats) { this.plats = plats; }
+  ajouter(plat) { this.plats.push(plat); return this; } // chaînable
+  totalTTC() { /* … */ }
+}
+new Commande([]).ajouter(a).ajouter(b).totalTTC();
+```
+
+## map et reduce
+
+```js
+plats.map((p) => p.prix * p.qte)      // un montant par ligne
+     .reduce((a, b) => a + b, 0)      // leur somme (0 si le tableau est vide)
+```
+
+## Exporter pour les tests
+
+```js
+module.exports = { totalProcedural, Commande, totalFonctionnel };
+```
+
+=== exemple
+// Exemple — une même règle (compter les articles), écrite de trois façons.
+const plats = [{ nom: 'Pizza', qte: 2 }, { nom: 'Tiramisu', qte: 3 }];
+
+// 1. Procédural : une variable qui s'accumule
+let n = 0;
+for (const p of plats) n += p.qte;
+console.log('procédural  :', n);
+
+// 2. Orienté objet : données et comportement dans une classe
+class Panier {
+  constructor(lignes) { this.lignes = lignes; }
+  ajouter(ligne) { this.lignes.push(ligne); return this; }
+  articles() { return this.lignes.reduce((total, l) => total + l.qte, 0); }
+}
+console.log('objet       :', new Panier([...plats]).ajouter({ nom: 'Café', qte: 1 }).articles());
+
+// 3. Fonctionnel : une fonction pure, rien n'est modifié
+const articles = (lignes) => lignes.map((l) => l.qte).reduce((a, b) => a + b, 0);
+console.log('fonctionnel :', articles(plats));
+
+=== indices
+La règle est la même dans les trois versions : additionner `prix * qte` pour chaque plat, multiplier par `1.2`, puis passer le résultat à `arrondi(...)`.
+---
+Procédural : `let total = 0;`, puis `for (const p of plats) total += p.prix * p.qte;`, enfin `return arrondi(total * 1.2);`.
+---
+Classe : `ajouter(plat) { this.plats.push(plat); return this; }`. C'est le `return this` qui permet d'enchaîner `.ajouter(a).ajouter(b)`.
+---
+`totalTTC()` n'a pas besoin de refaire le calcul : `totalTTC() { return totalFonctionnel(this.plats); }`.
+---
+Fonctionnel : `plats.map((p) => p.prix * p.qte)` donne un montant par ligne, puis `.reduce((a, b) => a + b, 0)` les additionne. Le `0` final fait qu'un tableau vide donne 0.
+---
+Les tests refusent toute boucle dans `totalFonctionnel` : `arrondi(plats.map((p) => p.prix * p.qte).reduce((a, b) => a + b, 0) * 1.2)` tient en une expression.

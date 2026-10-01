@@ -1,0 +1,128 @@
+@notion Serveur HTTP, routes, res.send et res.json
+@xp 80
+
+=== cours
+## Ton premier serveur
+
+> 🍽 Node.js est la cuisine. Express est le chef de rang : il reçoit chaque commande et l'envoie au bon poste.
+
+Jusqu'ici tu étais le client. Tu passes maintenant **en cuisine** : c'est toi qui réponds aux requêtes.
+
+## Node.js et Express
+
+**Node.js** exécute du JavaScript hors du navigateur. **Express** est une bibliothèque qui simplifie l'écriture d'un serveur HTTP.
+
+```js
+const express = require('express');
+const app = express();
+```
+
+## Une route
+
+Une route associe **une méthode et un chemin** à **une fonction**.
+
+```js
+app.get('/bonjour', (req, res) => {
+  res.send('Bonjour !');
+});
+```
+
+- `req` (la requête) : ce que le client a envoyé ;
+- `res` (la réponse) : ce que tu vas lui renvoyer.
+
+Tant que tu n'as pas appelé une méthode de `res`, le client attend.
+
+## Texte ou JSON
+
+```js
+res.send('Bienvenue');          // du texte
+res.json({ status: 'ok' });     // du JSON, avec le bon Content-Type
+```
+
+Une API REST répond presque toujours en JSON : utilise `res.json`.
+
+## Écouter sur un port
+
+```js
+app.listen(process.env.PORT || 3000);
+```
+
+Le serveur attend les requêtes sur un **port**. On le lit dans la variable d'environnement `PORT` : c'est l'hébergeur (ou ici apilab) qui choisit le port, pas le code.
+
+## Une route non déclarée
+
+Si aucune route ne correspond, Express répond `404 Not Found`. C'est ce que tu obtiens au départ sur `/` et `/health`.
+
+## Pourquoi /health ?
+
+C'est la route la plus simple d'une API : elle répond « je suis en vie ». Les outils de supervision l'appellent en permanence pour savoir si le service tourne.
+
+=== doc
+## Squelette
+
+```js
+const express = require('express');
+const app = express();
+app.use(express.json());           // pour lire les corps JSON
+
+app.get('/chemin', (req, res) => { /* … */ });
+
+app.listen(process.env.PORT || 3000);
+```
+
+## Répondre
+
+```js
+res.send('texte')            // 200 + texte
+res.json({ cle: 'valeur' })  // 200 + JSON
+res.status(404).json({ error: 'Introuvable' })
+```
+
+## Une méthode par verbe
+
+```js
+app.get(…)   app.post(…)   app.put(…)   app.delete(…)
+```
+
+## L'onglet Requête
+
+Sous l'éditeur, l'onglet **Requête** démarre ton serveur et lui envoie la requête de ton choix. Tu vois le statut, les en-têtes et le corps de la réponse.
+
+=== exemple
+// Exemple — un serveur Express minimal, interrogé par son propre client.
+const express = require('express');
+const app = express();
+
+app.get('/bonjour', (req, res) => res.send('Bonjour, bienvenue !'));
+app.get('/heure', (req, res) => res.json({ heure: new Date().toLocaleTimeString('fr-FR') }));
+
+// Port 0 : le système choisit un port libre, juste pour cette démonstration.
+const serveur = app.listen(0, async () => {
+  const base = `http://localhost:${serveur.address().port}`;
+
+  for (const chemin of ['/bonjour', '/heure', '/inconnu']) {
+    const res = await fetch(base + chemin);
+    console.log(`GET ${chemin} → ${res.status} (${res.headers.get('content-type')})`);
+    console.log('   ', (await res.text()).slice(0, 60).replace(/\s+/g, ' '));
+  }
+
+  serveur.closeAllConnections();
+  serveur.close(); // on arrête le serveur de démonstration
+});
+
+=== requetes
+GET /
+GET /health
+
+=== indices
+Une route s'écrit `app.get('/chemin', (req, res) => { … })`. Il t'en faut deux : une pour `/`, une pour `/health`.
+---
+Écris tes routes avant la ligne `app.listen(...)`, et ne modifie pas cette ligne : le port est fourni par `process.env.PORT`.
+---
+Pour `/`, renvoie du texte avec `res.send('Bienvenue au restaurant')`.
+---
+Pour `/health`, renvoie du JSON avec `res.json(...)` et non `res.send` : les tests vérifient le type de la réponse.
+---
+L'objet attendu sur `/health` est `{ status: 'ok' }`.
+---
+Les deux lignes complètes : `app.get('/', (req, res) => res.send('Bienvenue au restaurant'));` et `app.get('/health', (req, res) => res.json({ status: 'ok' }));`.

@@ -1,0 +1,149 @@
+@chapitre 1 · La mise en place
+@titre La recette qui ne rate jamais
+@notion Fonctions pures, effets de bord
+@xp 50
+@retenir une fonction pure ne dépend que de ses paramètres et ne modifie rien autour d'elle : mêmes entrées, même résultat, toujours.
+
+=== cours
+## Fonction pure
+
+> 🍽 Une bonne recette donne le même plat chaque fois qu'on lui fournit les mêmes ingrédients, et elle ne met pas le feu à la cuisine au passage.
+
+Une fonction est **pure** si elle respecte deux règles :
+
+1. **Mêmes entrées, même sortie.** Elle ne dépend que de ses paramètres.
+2. **Aucun effet de bord.** Elle ne modifie rien à l'extérieur : pas de variable globale, pas de fichier, pas d'affichage.
+
+## L'exemple à ne pas suivre
+
+```js
+let total = 0;
+
+function ajouter(prix) {
+  total = total + prix; // modifie une variable extérieure
+  return total;
+}
+
+ajouter(10); // 10
+ajouter(10); // 20  ← même appel, résultat différent
+```
+
+Cette fonction est **impure** : son résultat dépend de ce qui s'est passé avant. Impossible de la tester ou de la réutiliser sereinement.
+
+## La version pure
+
+```js
+const ajouter = (total, prix) => total + prix;
+
+ajouter(0, 10);  // 10
+ajouter(0, 10);  // 10, toujours
+```
+
+Tout ce dont la fonction a besoin entre par les paramètres. Tout ce qu'elle produit sort par `return`.
+
+## Pourquoi c'est précieux
+
+- **Facile à tester** : un appel, un résultat attendu.
+- **Facile à comprendre** : pas besoin de lire le reste du programme.
+- **Facile à combiner** : on peut les enchaîner sans surprise.
+
+En style fonctionnel, on déclare tout avec `const`. Pas de `let`, pas de `var`.
+
+=== doc
+## Reconnaître une fonction impure
+
+- Elle lit ou modifie une variable déclarée **en dehors** d'elle.
+- Elle modifie un de ses paramètres (tableau, objet).
+- Elle utilise `Math.random()`, `Date.now()`, `console.log`, un fichier, le réseau.
+
+## La rendre pure
+
+Passe en **paramètre** ce qu'elle lisait à l'extérieur, et **renvoie** ce qu'elle modifiait.
+
+```js
+// impure
+let tva = 0.1;
+const ttc = (prix) => prix * (1 + tva);
+
+// pure
+const ttc = (prix, tva) => prix * (1 + tva);
+```
+
+Les effets de bord restent nécessaires (afficher, enregistrer) : on les garde simplement **au bord** du programme, autour d'un cœur de fonctions pures.
+
+=== exemple
+// Compare une fonction impure et sa version pure.
+
+let caisse = 0;
+const encaisserImpure = (prix) => {
+  caisse = caisse + prix; // effet de bord
+  return caisse;
+};
+
+const encaisserPure = (caisse, prix) => caisse + prix;
+
+console.log('impure :', encaisserImpure(10), encaisserImpure(10)); // 10 puis 20
+console.log('pure   :', encaisserPure(0, 10), encaisserPure(0, 10)); // 10 et 10
+
+=== consigne
+## Défi : assainir la caisse
+
+L'ancien code de la caisse utilisait des variables globales. Réécris-le avec trois **fonctions pures** :
+
+1. `additionner(total, prix)` renvoie le nouveau total.
+2. `prixTTC(prix, taux)` renvoie le prix avec la taxe. `prixTTC(100, 0.2)` renvoie `120`.
+3. `ticket(nom, prix)` renvoie le texte `Burger : 12 €` pour `ticket('Burger', 12)`.
+
+**Règle :** uniquement `const`. Ni `let`, ni `var`.
+
+=== depart
+// Quête 2 — La recette qui ne rate jamais
+
+// Ancien code impur, à remplacer (laissé en commentaire pour mémoire) :
+//   let total = 0;
+//   let taux = 0.1;
+//   function ajouter(prix) { total = total + prix; }
+//   function ttc(prix) { return prix * (1 + taux); }
+
+const additionner = (total, prix) => {
+  // TODO
+};
+
+const prixTTC = (prix, taux) => {
+  // TODO
+};
+
+const ticket = (nom, prix) => {
+  // TODO : renvoyer le texte, sans console.log
+};
+
+module.exports = { additionner, prixTTC, ticket };
+
+=== solution
+// Quête 2 — La recette qui ne rate jamais
+
+const additionner = (total, prix) => total + prix;
+
+const prixTTC = (prix, taux) => prix * (1 + taux);
+
+const ticket = (nom, prix) => `${nom} : ${prix} €`;
+
+module.exports = { additionner, prixTTC, ticket };
+
+=== indices
+Chaque fonction tient en une ligne : elle calcule à partir de ses paramètres et renvoie le résultat.
+---
+`prixTTC` : le prix multiplié par `(1 + taux)`. `ticket` : un gabarit `${nom} : ${prix} €`.
+---
+`const additionner = (total, prix) => total + prix;` et les deux autres sur le même modèle, sans accolades.
+
+=== tests
+interdit(/\b(let|var)\b/, 'uniquement const (ni let, ni var)');
+test('additionner(10, 5) renvoie 15', (m, t) => t.egal(m.additionner(10, 5), 15));
+test('additionner est pure : deux appels identiques, deux résultats identiques', (m, t) => {
+  t.egal(m.additionner(0, 10), 10);
+  t.egal(m.additionner(0, 10), 10, 'Le deuxième appel donne un autre résultat : ta fonction garde un état.');
+});
+test('prixTTC(100, 0.2) renvoie 120', (m, t) => t.proche(m.prixTTC(100, 0.2), 120));
+test('prixTTC(100, 0.1) renvoie 110 (le taux vient du paramètre)', (m, t) => t.proche(m.prixTTC(100, 0.1), 110));
+test("ticket('Burger', 12) renvoie « Burger : 12 € »", (m, t) => t.egal(m.ticket('Burger', 12), 'Burger : 12 €'));

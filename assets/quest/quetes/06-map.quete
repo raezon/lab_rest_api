@@ -1,0 +1,150 @@
+@chapitre 2 · À la chaîne
+@titre Le passe-plat
+@notion map : transformer chaque élément
+@xp 80
+@retenir map applique une fonction à chaque élément et renvoie un nouveau tableau de même longueur. Fini les boucles for.
+
+=== cours
+## map : transformer chaque élément
+
+> 🍽 Au passe-plat, chaque assiette qui arrive reçoit la même finition avant de partir en salle. Dix assiettes entrent, dix assiettes sortent, toutes dressées.
+
+`map` prend une fonction et l'applique à **chaque** élément. Elle renvoie un **nouveau** tableau, de la **même longueur**.
+
+```js
+const prix = [10, 20, 30];
+
+const doubles = prix.map((p) => p * 2); // [20, 40, 60]
+```
+
+## Avant, avec une boucle
+
+```js
+const doubles = [];
+for (let i = 0; i < prix.length; i++) {
+  doubles.push(prix[i] * 2);
+}
+```
+
+La boucle décrit **comment** faire (un compteur, un tableau à remplir). `map` dit **quoi** faire : « double chaque prix ». C'est le style **déclaratif**.
+
+## Avec des objets
+
+```js
+const menu = [
+  { nom: 'Soupe', prix: 7 },
+  { nom: 'Burger', prix: 14 },
+];
+
+menu.map((plat) => plat.nom); // ['Soupe', 'Burger']
+```
+
+Pour renvoyer un objet modifié, combine `map` et le spread :
+
+```js
+menu.map((plat) => ({ ...plat, prix: plat.prix + 1 }));
+```
+
+Les parenthèses autour de `{ ... }` sont nécessaires pour renvoyer un objet.
+
+=== doc
+## map
+
+```js
+tableau.map((element) => nouvelleValeur)
+```
+
+- Renvoie un **nouveau** tableau, de même longueur.
+- Ne modifie pas le tableau d'origine.
+- La fonction reçoit aussi l'indice : `(element, indice) => ...`
+
+## Cas courants
+
+```js
+menu.map((p) => p.nom)                       // extraire une propriété
+menu.map((p) => ({ ...p, prix: p.prix + 1 })) // modifier chaque objet
+menu.map((p) => `${p.nom} — ${p.prix} €`)     // formater
+```
+
+## Erreur fréquente
+
+Oublier de renvoyer une valeur donne un tableau de `undefined` :
+
+```js
+[1, 2].map((n) => { n * 2; }); // [undefined, undefined]
+```
+
+=== exemple
+// map transforme chaque élément et renvoie un nouveau tableau.
+
+const menu = [
+  { nom: 'Soupe de légumes', prix: 7 },
+  { nom: 'Burger', prix: 14 },
+  { nom: 'Tiramisu', prix: 6 },
+];
+
+console.log(menu.map((plat) => plat.nom));
+console.log(menu.map((plat) => plat.prix * 2));
+console.log(menu.map((plat) => ({ ...plat, prix: plat.prix + 1 })));
+console.log('original intact :', menu[0]);
+
+=== consigne
+## Défi : préparer l'ardoise
+
+Le menu est un tableau d'objets `{ nom, prix }`. Écris trois fonctions avec `map` :
+
+1. `nomsDesPlats(menu)` renvoie le tableau des noms.
+2. `augmenter(menu, euros)` renvoie les plats avec leur prix augmenté de `euros`. Les objets d'origine ne doivent pas être modifiés.
+3. `ardoise(menu)` renvoie les lignes à écrire : `Burger — 14 €` pour chaque plat.
+
+**Règles :** utilise `map`. Pas de boucle `for`, `while` ni `forEach`.
+
+=== depart
+// Quête 6 — Le passe-plat
+
+const nomsDesPlats = (menu) => {
+  // TODO
+};
+
+const augmenter = (menu, euros) => {
+  // TODO : nouveaux objets, prix + euros
+};
+
+const ardoise = (menu) => {
+  // TODO : « Burger — 14 € »
+};
+
+module.exports = { nomsDesPlats, augmenter, ardoise };
+
+=== solution
+// Quête 6 — Le passe-plat
+
+const nomsDesPlats = (menu) => menu.map((plat) => plat.nom);
+
+const augmenter = (menu, euros) => menu.map((plat) => ({ ...plat, prix: plat.prix + euros }));
+
+const ardoise = (menu) => menu.map((plat) => `${plat.nom} — ${plat.prix} €`);
+
+module.exports = { nomsDesPlats, augmenter, ardoise };
+
+=== indices
+`menu.map((plat) => ...)` : à droite de la flèche, écris ce que devient chaque plat.
+---
+Pour `augmenter`, renvoie une copie de chaque plat : `({ ...plat, prix: plat.prix + euros })`. Si tu écris `plat.prix += euros`, tu modifies l'original.
+---
+`ardoise` : dans le `map`, renvoie un gabarit entre accents graves qui contient `${plat.nom} — ${plat.prix} €`. Le tiret est un tiret long « — » : copie-le depuis la consigne.
+
+=== tests
+const MENU = () => [
+  { nom: 'Soupe', prix: 7 },
+  { nom: 'Burger', prix: 14 },
+  { nom: 'Tiramisu', prix: 6 },
+];
+requis(/\.map\(/, 'utiliser map');
+interdit(/\b(for|while)\b|\.forEach\(/, 'pas de boucle for, while ni forEach');
+test('nomsDesPlats renvoie les noms', (m, t) => t.egal(m.nomsDesPlats(MENU()), ['Soupe', 'Burger', 'Tiramisu']));
+test('nomsDesPlats sur un menu vide renvoie []', (m, t) => t.egal(m.nomsDesPlats([]), []));
+test('augmenter ajoute les euros à chaque prix', (m, t) =>
+  t.egal(m.augmenter(MENU(), 2), [{ nom: 'Soupe', prix: 9 }, { nom: 'Burger', prix: 16 }, { nom: 'Tiramisu', prix: 8 }]));
+test('augmenter ne modifie pas les plats d\'origine', (m, t) => t.sansMutation(MENU(), (menu) => m.augmenter(menu, 2)));
+test('ardoise formate chaque ligne', (m, t) => t.egal(m.ardoise(MENU()), ['Soupe — 7 €', 'Burger — 14 €', 'Tiramisu — 6 €']));

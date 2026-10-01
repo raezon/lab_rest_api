@@ -1,0 +1,167 @@
+@notion Authentification (401), autorisation (403), jeton JWT
+@xp 150
+
+=== cours
+## Qui es-tu ? As-tu le droit ?
+
+> 🏨 À l'hôtel, la réception vérifie ton identité et te remet une carte. Ensuite, cette carte n'ouvre que ta chambre, pas celle du voisin.
+
+Deux questions distinctes protègent une API.
+
+- **Authentification** : *qui es-tu ?* Si le serveur ne le sait pas, il répond `401 Unauthorized`.
+- **Autorisation** : *as-tu le droit de faire ça ?* S'il sait qui tu es mais que c'est interdit, il répond `403 Forbidden`.
+
+## Le jeton JWT
+
+HTTP est **sans mémoire** : chaque requête est indépendante. Pour ne pas redemander le mot de passe à chaque fois, le serveur remet un **jeton** au moment de la connexion, et le client le présente ensuite.
+
+Un JWT a trois parties séparées par des points :
+
+```js
+entête.contenu.signature
+```
+
+- le **contenu** (*payload*) porte des informations : l'identifiant de l'utilisateur, son rôle, la date d'expiration ;
+- la **signature** prouve que le serveur a émis ce jeton et que personne ne l'a modifié.
+
+Attention : le contenu est **encodé, pas chiffré**. N'importe qui peut le lire. On n'y met jamais de secret ni de mot de passe.
+
+## Créer et vérifier
+
+```js
+const jwt = require('jsonwebtoken');
+
+const token = jwt.sign({ sub: user.id, role: user.role }, SECRET, { expiresIn: '15m' });
+
+const payload = jwt.verify(token, SECRET); // lève une erreur si faux ou expiré
+```
+
+`sub` (*subject*) est le nom conventionnel de l'identifiant de l'utilisateur.
+
+## Présenter le jeton
+
+Le client l'envoie dans l'en-tête `Authorization`, précédé du mot `Bearer` :
+
+```js
+Authorization: Bearer eyJhbGciOi…
+```
+
+## Un middleware d'authentification
+
+```js
+function auth(req, res, next) {
+  const [type, token] = (req.headers.authorization || '').split(' ');
+  if (type !== 'Bearer' || !token) return res.status(401).json({ error: 'Token manquant' });
+  try {
+    req.user = jwt.verify(token, SECRET); // on garde le payload pour la suite
+    next();
+  } catch {
+    res.status(401).json({ error: 'Token invalide' });
+  }
+}
+```
+
+## Une fabrique pour les rôles
+
+`requireRole('admin')` **renvoie** un middleware configuré pour ce rôle :
+
+```js
+const requireRole = (role) => (req, res, next) =>
+  req.user.role === role ? next() : res.status(403).json({ error: 'Accès refusé' });
+```
+
+## Protéger une route
+
+On place les middlewares avant le gestionnaire, dans l'ordre : d'abord *qui*, ensuite *le droit*.
+
+```js
+app.delete('/api/plats/:id', auth, requireRole('admin'), (req, res) => res.status(204).end());
+```
+
+=== doc
+## jsonwebtoken
+
+```js
+jwt.sign(payload, secret, { expiresIn: '15m' })  // → token
+jwt.verify(token, secret)                        // → payload, ou erreur
+```
+
+## 401 ou 403 ?
+
+- pas de jeton, jeton faux ou expiré → `401`
+- jeton valide, mais rôle insuffisant → `403`
+- identifiants de connexion incorrects → `401`
+
+## Lire l'en-tête
+
+```js
+const [type, token] = (req.headers.authorization || '').split(' ');
+```
+
+## Enchaîner des middlewares sur une route
+
+```js
+app.get('/api/profil', auth, (req, res) => res.json({ id: req.user.sub, role: req.user.role }));
+```
+
+## Dans l'onglet Requête
+
+Après un `POST /auth/login` réussi, le jeton reçu est mémorisé. Écris `{{token}}` dans un en-tête pour l'utiliser :
+
+```js
+Authorization: Bearer {{token}}
+```
+
+## En production
+
+Les mots de passe ne sont jamais stockés en clair (on les hache avec bcrypt ou argon2), et le secret vient d'une variable d'environnement.
+
+=== exemple
+// Exemple — fabriquer un jeton, le lire, le vérifier, puis le falsifier.
+const jwt = require('jsonwebtoken');
+const SECRET = 'secret-de-demonstration';
+
+const token = jwt.sign({ sub: 7, role: 'serveur' }, SECRET, { expiresIn: '15m' });
+console.log('jeton   :', token.slice(0, 50) + '…');
+
+// Le contenu est lisible par tous : il est encodé en base64, pas chiffré.
+const contenu = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+console.log('contenu :', contenu);
+
+console.log('vérifié :', jwt.verify(token, SECRET).role);
+
+// On change le rôle dans le contenu : la signature ne correspond plus.
+const [entete, , signature] = token.split('.');
+const faux = Buffer.from(JSON.stringify({ ...contenu, role: 'admin' })).toString('base64url');
+try {
+  jwt.verify(`${entete}.${faux}.${signature}`, SECRET);
+} catch (err) {
+  console.log('falsifié :', err.message);
+}
+
+=== consigne
+Deux comptes existent dans le fichier : `chef@resto.fr` / `admin123` (rôle `admin`) et `client@resto.fr` / `client123` (rôle `user`).
+
+=== requetes
+POST /auth/login | {"email":"chef@resto.fr","password":"admin123"}
+POST /auth/login | {"email":"client@resto.fr","password":"client123"}
+POST /auth/login | {"email":"chef@resto.fr","password":"faux"}
+GET /api/menu
+GET /api/profil
+GET /api/profil | | Authorization: Bearer {{token}}
+DELETE /api/plats/1 | | Authorization: Bearer {{token}}
+
+=== indices
+Connexion : cherche le compte avec `users.find((u) => u.email === req.body.email && u.password === req.body.password)`. S'il est introuvable, réponds `res.status(401).json({ error: 'Identifiants invalides' })`.
+---
+Signe le jeton : `jwt.sign({ sub: u.id, role: u.role }, SECRET, { expiresIn: '15m' })`, puis renvoie `res.json({ token })`.
+---
+Middleware `auth` : découpe l'en-tête avec `const [type, token] = (req.headers.authorization || '').split(' ');`. Si `type !== 'Bearer'` ou s'il n'y a pas de token, réponds 401.
+---
+Vérifie le jeton dans un `try` : `req.user = jwt.verify(token, SECRET); next();`. Dans le `catch`, réponds 401 : un jeton faux ou expiré lève une erreur.
+---
+`requireRole` est une fabrique de middleware : `const requireRole = (role) => (req, res, next) => (req.user.role === role ? next() : res.status(403).json({ error: 'Accès refusé' }));`.
+---
+Profil : `app.get('/api/profil', auth, (req, res) => res.json({ id: req.user.sub, role: req.user.role }));`.
+---
+Suppression : `app.delete('/api/plats/:id', auth, requireRole('admin'), (req, res) => res.status(204).end());`. L'ordre compte : `auth` avant `requireRole`.

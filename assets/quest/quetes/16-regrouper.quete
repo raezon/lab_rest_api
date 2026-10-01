@@ -1,0 +1,165 @@
+@chapitre 4 · Le garde-manger
+@titre Ranger le garde-manger
+@notion Regrouper et compter avec reduce
+@xp 150
+@retenir pour regrouper, on réduit vers un objet : à chaque tour, on renvoie une copie de l'accumulateur avec la bonne clé mise à jour.
+
+=== cours
+## Regrouper : reduce vers un objet
+
+> 🍽 En rangeant le garde-manger, on trie les produits par étagère : les légumes ici, les laitages là. À la fin, chaque étagère porte une étiquette et contient ses produits.
+
+Jusqu'ici, `reduce` produisait un nombre ou un tableau. Il peut aussi produire un **objet**, dont les clés sont les étiquettes.
+
+## Compter par catégorie
+
+```js
+const compter = (menu) =>
+  menu.reduce((acc, plat) => ({ ...acc, [plat.categorie]: (acc[plat.categorie] || 0) + 1 }), {});
+
+// { entrée: 2, plat: 2, dessert: 1 }
+```
+
+Deux nouveautés :
+
+- `[plat.categorie]: ...` est une **clé calculée** : le nom de la clé vient d'une variable.
+- `acc[cle] || 0` donne `0` la première fois qu'on rencontre la clé, quand elle n'existe pas encore.
+
+## Regrouper les éléments
+
+Même principe, mais la valeur est un **tableau** qu'on prolonge :
+
+```js
+{ ...acc, [cle]: [...(acc[cle] || []), plat] }
+```
+
+- `acc[cle] || []` : le groupe existant, ou un tableau vide.
+- `[..., plat]` : une copie du groupe, plus le nouvel élément.
+- `{ ...acc, [cle]: ... }` : une copie de l'accumulateur avec ce groupe remplacé.
+
+Aucune mutation : à chaque tour, on fabrique un nouvel objet.
+
+## Généraliser avec une fonction de clé
+
+Plutôt que de coder `plat.categorie` en dur, on reçoit une **fonction** qui dit à quelle étagère va chaque élément. Le même outil regroupe alors par catégorie, par prix, par première lettre…
+
+=== doc
+## Clé calculée
+
+```js
+const cle = 'prix';
+({ [cle]: 14 }); // { prix: 14 }
+```
+
+## Valeur par défaut
+
+```js
+acc[cle] || 0    // nombre : 0 si absent
+acc[cle] || []   // tableau : [] si absent
+```
+
+## Compter
+
+```js
+t.reduce((acc, e) => ({ ...acc, [cle(e)]: (acc[cle(e)] || 0) + 1 }), {})
+```
+
+## Regrouper
+
+```js
+t.reduce((acc, e) => ({ ...acc, [cle(e)]: [...(acc[cle(e)] || []), e] }), {})
+```
+
+## Depuis Node 21
+
+`Object.groupBy(tableau, fnCle)` fait ce regroupement directement. Savoir l'écrire soi-même reste indispensable pour les variantes (compter, sommer…).
+
+=== exemple
+// reduce vers un objet : compter et regrouper.
+
+const menu = [
+  { nom: 'Salade', categorie: 'entrée' },
+  { nom: 'Soupe', categorie: 'entrée' },
+  { nom: 'Burger', categorie: 'plat' },
+  { nom: 'Tiramisu', categorie: 'dessert' },
+];
+
+const comptes = menu.reduce((acc, plat) => ({ ...acc, [plat.categorie]: (acc[plat.categorie] || 0) + 1 }), {});
+console.log(comptes);
+
+const groupes = menu.reduce(
+  (acc, plat) => ({ ...acc, [plat.categorie]: [...(acc[plat.categorie] || []), plat.nom] }),
+  {}
+);
+console.log(groupes);
+
+=== consigne
+## Défi : étiqueter les étagères
+
+1. `compterParCategorie(menu)` renvoie un objet `{ catégorie: nombre de plats }`.
+2. `grouperPar(tableau, fnCle)` : outil générique. `fnCle(element)` donne la clé du groupe. Renvoie `{ clé: [éléments] }`, les éléments gardant leur ordre d'origine.
+3. `grouperParCategorie(menu)` renvoie `{ catégorie: [plats] }`. Construis-la avec `grouperPar`.
+
+**Règles :** pas de boucle, pas de `push`. Les données reçues ne doivent pas être modifiées.
+
+=== depart
+// Quête 16 — Ranger le garde-manger
+
+const compterParCategorie = (menu) => {
+  // TODO : reduce vers un objet { catégorie: nombre }
+};
+
+const grouperPar = (tableau, fnCle) => {
+  // TODO : reduce vers un objet { clé: [éléments] }
+};
+
+const grouperParCategorie = (menu) => {
+  // TODO : avec grouperPar
+};
+
+module.exports = { compterParCategorie, grouperPar, grouperParCategorie };
+
+=== solution
+// Quête 16 — Ranger le garde-manger
+
+const compterParCategorie = (menu) =>
+  menu.reduce((acc, plat) => ({ ...acc, [plat.categorie]: (acc[plat.categorie] || 0) + 1 }), {});
+
+const grouperPar = (tableau, fnCle) =>
+  tableau.reduce((acc, element) => {
+    const cle = fnCle(element);
+    return { ...acc, [cle]: [...(acc[cle] || []), element] };
+  }, {});
+
+const grouperParCategorie = (menu) => grouperPar(menu, (plat) => plat.categorie);
+
+module.exports = { compterParCategorie, grouperPar, grouperParCategorie };
+
+=== indices
+Pars de `{}` et renvoie à chaque tour `{ ...acc, [cle]: nouvelleValeur }`.
+---
+Pour compter : `(acc[cle] || 0) + 1`. Pour regrouper : `[...(acc[cle] || []), element]`.
+---
+Dans `grouperPar`, calcule d'abord `const cle = fnCle(element);`. Ensuite `grouperParCategorie` tient en une ligne : `grouperPar(menu, (plat) => plat.categorie)`.
+
+=== tests
+interdit(/\b(for|while)\b|\.forEach\(|\.push\(/, 'pas de boucle ni de push');
+const MENU = () => [
+  { nom: 'Salade', categorie: 'entrée' },
+  { nom: 'Burger', categorie: 'plat' },
+  { nom: 'Soupe', categorie: 'entrée' },
+  { nom: 'Tiramisu', categorie: 'dessert' },
+  { nom: 'Risotto', categorie: 'plat' },
+];
+test('compterParCategorie compte les plats de chaque catégorie', (m, t) =>
+  t.egal(t.sansMutation(MENU(), (menu) => m.compterParCategorie(menu)), { entrée: 2, plat: 2, dessert: 1 }));
+test('compterParCategorie d\'un menu vide renvoie {}', (m, t) => t.egal(m.compterParCategorie([]), {}));
+test('grouperPar regroupe selon la fonction de clé', (m, t) =>
+  t.egal(m.grouperPar([1, 2, 3, 4, 5], (n) => (n % 2 === 0 ? 'pair' : 'impair')), { impair: [1, 3, 5], pair: [2, 4] }));
+test('grouperPar accepte n\'importe quelle clé', (m, t) =>
+  t.egal(m.grouperPar(['Soupe', 'Salade', 'Burger'], (nom) => nom[0]), { S: ['Soupe', 'Salade'], B: ['Burger'] }));
+test('grouperParCategorie renvoie les plats par catégorie, dans l\'ordre', (m, t) => {
+  const menu = MENU();
+  const r = t.sansMutation(menu, (x) => m.grouperParCategorie(x));
+  t.egal(r, { entrée: [menu[0], menu[2]], plat: [menu[1], menu[4]], dessert: [menu[3]] });
+});

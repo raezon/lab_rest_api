@@ -1,0 +1,205 @@
+@chapitre 5 · Le coup de feu
+@titre La brigade au complet
+@notion Outils curryfiés « donnée en dernier » et style point-free
+@xp 200
+@retenir des outils curryfiés qui prennent la donnée en dernier s'emboîtent directement dans pipe : on décrit le traitement sans jamais nommer la donnée.
+
+=== cours
+## Tout assembler
+
+> 🍽 Une brigade rodée n'a plus besoin qu'on lui décrive chaque assiette. Le chef annonce l'enchaînement des postes, et n'importe quelle commande suit le circuit.
+
+Tu maîtrises les fonctions pures, `map`/`filter`/`reduce`, le currying et `pipe`. Il reste à les faire travailler **ensemble**.
+
+## Le problème
+
+`pipe` attend des fonctions à **un seul paramètre**. Or `menu.filter(...)` est une méthode : on doit nommer `menu` à chaque étape.
+
+```js
+const totalVegetarien = (menu) =>
+  menu.filter((p) => p.vegetarien).map((p) => p.prix).reduce((a, b) => a + b, 0);
+```
+
+## Des outils « donnée en dernier »
+
+On enveloppe chaque méthode dans une fonction **curryfiée** : la configuration d'abord, le tableau à la fin.
+
+```js
+const map = (fn) => (tableau) => tableau.map(fn);
+const filter = (predicat) => (tableau) => tableau.filter(predicat);
+```
+
+`filter(estVegetarien)` est alors une fonction qui **attend un tableau**. Exactement ce que `pipe` sait brancher.
+
+## Un outil pour lire une propriété
+
+```js
+const prop = (cle) => (objet) => objet[cle];
+
+prop('prix')({ nom: 'Burger', prix: 14 }); // 14
+```
+
+`prop('vegetarien')` remplace `(p) => p.vegetarien`, et `prop('prix')` remplace `(p) => p.prix`.
+
+## Le style point-free
+
+```js
+const totalVegetarien = pipe(
+  filter(prop('vegetarien')),
+  map(prop('prix')),
+  reduce((a, b) => a + b, 0)
+);
+```
+
+Le paramètre `menu` a disparu. On ne décrit plus **comment manipuler une donnée**, on décrit **un enchaînement de transformations**. C'est le style *point-free* (sans « point », c'est-à-dire sans argument nommé).
+
+## Avec mesure
+
+Le point-free rend les pipelines très lisibles quand chaque étape porte un nom parlant. Poussé à l'extrême, il devient un casse-tête. Si une fléchée explicite est plus claire, garde-la.
+
+Des bibliothèques comme Ramda ou lodash/fp fournissent ces outils tout faits. Tu sais maintenant comment ils sont construits.
+
+=== doc
+## Outils curryfiés, donnée en dernier
+
+```js
+const map = (fn) => (t) => t.map(fn);
+const filter = (predicat) => (t) => t.filter(predicat);
+const reduce = (fn, initial) => (t) => t.reduce(fn, initial);
+const prop = (cle) => (objet) => objet[cle];
+```
+
+## Pourquoi « donnée en dernier »
+
+L'appel partiel `filter(predicat)` laisse une fonction qui n'attend plus que le tableau : elle s'insère telle quelle dans `pipe`.
+
+## Point-free
+
+```js
+// avec le paramètre
+const noms = (menu) => menu.map((p) => p.nom);
+
+// point-free
+const noms = map(prop('nom'));
+```
+
+## Pour aller plus loin
+
+- Ramda : `R.pipe`, `R.map`, `R.prop`, `R.filter`
+- lodash/fp : la variante fonctionnelle de lodash
+
+=== exemple
+// Des outils curryfiés qui s'emboîtent dans pipe.
+
+const pipe = (...fns) => (x) => fns.reduce((acc, fn) => fn(acc), x);
+const map = (fn) => (tableau) => tableau.map(fn);
+const filter = (predicat) => (tableau) => tableau.filter(predicat);
+const prop = (cle) => (objet) => objet[cle];
+
+const menu = [
+  { nom: 'Soupe', prix: 7, vegetarien: true },
+  { nom: 'Burger', prix: 14, vegetarien: false },
+  { nom: 'Tiramisu', prix: 6, vegetarien: true },
+];
+
+console.log(map(prop('nom'))(menu));
+
+// Point-free : le paramètre « menu » n'apparaît nulle part.
+const nomsVegetariens = pipe(filter(prop('vegetarien')), map(prop('nom')));
+
+console.log(nomsVegetariens(menu));
+
+=== consigne
+## Défi : la boîte à outils du chef
+
+La fonction `pipe` est fournie.
+
+1. `map(fn)(tableau)` : version curryfiée de `tableau.map(fn)`.
+2. `filter(predicat)(tableau)` : version curryfiée de `tableau.filter(predicat)`.
+3. `reduce(fn, initial)(tableau)` : version curryfiée de `tableau.reduce(fn, initial)`.
+4. `prop(cle)(objet)` renvoie `objet[cle]`.
+5. `totalVegetarien` : la somme des prix des plats végétariens, écrite en **style point-free** avec `pipe` et tes quatre outils. Le mot `menu` ne doit pas apparaître dans sa définition.
+
+=== depart
+// Quête 24 — La brigade au complet
+
+// Fournie : ne pas modifier.
+const pipe = (...fonctions) => (valeur) => fonctions.reduce((acc, fn) => fn(acc), valeur);
+
+const map = (fn) => {
+  // TODO : renvoyer une fonction qui attend le tableau
+};
+
+const filter = (predicat) => {
+  // TODO
+};
+
+const reduce = (fn, initial) => {
+  // TODO
+};
+
+const prop = (cle) => {
+  // TODO
+};
+
+// TODO : remplace undefined par pipe(...), sans écrire de paramètre
+const totalVegetarien = undefined;
+
+module.exports = { map, filter, reduce, prop, totalVegetarien };
+
+=== solution
+// Quête 24 — La brigade au complet
+
+const pipe = (...fonctions) => (valeur) => fonctions.reduce((acc, fn) => fn(acc), valeur);
+
+const map = (fn) => (tableau) => tableau.map(fn);
+
+const filter = (predicat) => (tableau) => tableau.filter(predicat);
+
+const reduce = (fn, initial) => (tableau) => tableau.reduce(fn, initial);
+
+const prop = (cle) => (objet) => objet[cle];
+
+const totalVegetarien = pipe(
+  filter(prop('vegetarien')),
+  map(prop('prix')),
+  reduce((a, b) => a + b, 0)
+);
+
+module.exports = { map, filter, reduce, prop, totalVegetarien };
+
+=== indices
+Chaque outil a deux flèches : la configuration, puis la donnée. Par exemple `const map = (fn) => (tableau) => tableau.map(fn);`
+---
+`prop('prix')` doit renvoyer une fonction `(objet) => objet[cle]`. Utilise les crochets : la clé est dans une variable.
+---
+`const totalVegetarien = pipe(filter(prop('vegetarien')), map(prop('prix')), reduce((a, b) => a + b, 0));`
+
+=== tests
+requis(/totalVegetarien\s*=\s*pipe\(/, 'totalVegetarien est construit directement avec pipe(…), en style point-free');
+const MENU = () => [
+  { nom: 'Salade César', prix: 9, vegetarien: false },
+  { nom: 'Soupe', prix: 7, vegetarien: true },
+  { nom: 'Risotto', prix: 13, vegetarien: true },
+  { nom: 'Tiramisu', prix: 6, vegetarien: true },
+];
+test('map(fn) renvoie une fonction qui attend le tableau', (m, t) => {
+  t.vrai(typeof m.map((x) => x) === 'function', 'map(fn) doit renvoyer une fonction.');
+  t.egal(m.map((n) => n * 2)([1, 2, 3]), [2, 4, 6]);
+});
+test('filter(predicat)(tableau) filtre', (m, t) => t.egal(m.filter((n) => n > 1)([1, 2, 3]), [2, 3]));
+test('reduce(fn, initial)(tableau) réduit', (m, t) => {
+  t.egal(m.reduce((a, b) => a + b, 0)([1, 2, 3]), 6);
+  t.egal(m.reduce((a, b) => a + b, 0)([]), 0);
+});
+test("prop('prix') lit la propriété d'un objet", (m, t) => {
+  t.egal(m.prop('prix')({ nom: 'Burger', prix: 14 }), 14);
+  t.egal(m.prop('nom')({ nom: 'Burger', prix: 14 }), 'Burger');
+});
+test('les outils se combinent : map(prop(\'nom\'))', (m, t) =>
+  t.egal(m.map(m.prop('nom'))(MENU()), ['Salade César', 'Soupe', 'Risotto', 'Tiramisu']));
+test('totalVegetarien(menu) renvoie 26', (m, t) => {
+  t.vrai(typeof m.totalVegetarien === 'function', 'totalVegetarien doit être une fonction : remplace undefined par un pipe.');
+  t.egal(t.sansMutation(MENU(), (menu) => m.totalVegetarien(menu)), 26);
+});
+test('totalVegetarien d\'un menu vide vaut 0', (m, t) => t.egal(m.totalVegetarien([]), 0));

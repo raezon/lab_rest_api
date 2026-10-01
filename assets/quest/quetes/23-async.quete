@@ -1,0 +1,206 @@
+@chapitre 5 · Le coup de feu
+@titre Les fourneaux en parallèle
+@notion Promesses, Promise.all et composition asynchrone
+@xp 200
+@retenir map transforme une liste en liste de promesses, Promise.all les attend toutes en parallèle. Les fonctions asynchrones se composent comme les autres.
+
+=== cours
+## Le fonctionnel rencontre l'asynchrone
+
+> 🍽 Pendant le coup de feu, on ne cuit pas les plats l'un après l'autre : tous les fourneaux tournent **en même temps**, et la commande part quand **tout** est prêt.
+
+En Node.js, lire un fichier ou interroger une API prend du temps. Ces opérations renvoient une **promesse** : un objet qui représente une valeur à venir.
+
+```js
+const chercherPlat = (nom) => new Promise((resolve) => setTimeout(() => resolve({ nom, prix: 14 }), 40));
+
+chercherPlat('Burger').then((plat) => console.log(plat));
+```
+
+## async et await
+
+Une fonction `async` renvoie toujours une promesse. À l'intérieur, `await` attend le résultat d'une promesse.
+
+```js
+const prixDe = async (nom) => {
+  const plat = await chercherPlat(nom);
+  return plat.prix;
+};
+```
+
+## map + Promise.all : le parallèle
+
+`map` avec une fonction asynchrone donne un **tableau de promesses**, toutes lancées immédiatement. `Promise.all` les réunit en une seule promesse, qui donne le tableau des résultats **dans le même ordre**.
+
+```js
+const preparer = (noms) => Promise.all(noms.map(chercherPlat));
+```
+
+Quatre plats de 40 ms sont prêts en 40 ms environ, pas en 160.
+
+## Le piège : await dans une boucle
+
+```js
+for (const nom of noms) {
+  plats.push(await chercherPlat(nom)); // un plat à la fois : lent
+}
+```
+
+Chaque tour attend le précédent. C'est du séquentiel déguisé, avec une mutation en prime.
+
+## Composer des étapes asynchrones
+
+`pipe` (quête 14) branchait des fonctions ordinaires. Sa version asynchrone enchaîne avec `.then`, en partant d'une promesse déjà résolue :
+
+```js
+const pipeAsync = (...fns) => (valeur) => fns.reduce((promesse, fn) => promesse.then(fn), Promise.resolve(valeur));
+```
+
+`.then` accepte indifféremment une fonction ordinaire ou asynchrone : on peut mélanger les deux dans la chaîne.
+
+## Les erreurs
+
+Si une seule promesse échoue, `Promise.all` échoue entièrement. C'est le comportement attendu ici : une commande dont un plat est introuvable ne part pas.
+
+=== doc
+## Promesses
+
+```js
+Promise.resolve(valeur)        // promesse déjà résolue
+promesse.then((v) => suite)    // enchaîner
+await promesse                 // attendre, dans une fonction async
+```
+
+## Parallèle
+
+```js
+const resultats = await Promise.all(liste.map(fnAsync));
+```
+
+- Tout est lancé en même temps.
+- Les résultats gardent l'ordre de la liste.
+- Une seule erreur fait échouer l'ensemble.
+
+## Variantes
+
+```js
+Promise.allSettled(promesses) // attend tout, sans échouer : [{ status, value | reason }]
+Promise.race(promesses)       // la première terminée
+```
+
+## pipe asynchrone
+
+```js
+const pipeAsync = (...fns) => (x) => fns.reduce((p, fn) => p.then(fn), Promise.resolve(x));
+```
+
+=== exemple
+// Séquentiel contre parallèle : compare les durées.
+
+const chercherPlat = (nom) => new Promise((resolve) => setTimeout(() => resolve(nom.toUpperCase()), 100));
+
+const noms = ['soupe', 'burger', 'risotto', 'tiramisu'];
+
+const principal = async () => {
+  let debut = Date.now();
+  const unParUn = [];
+  for (const nom of noms) unParUn.push(await chercherPlat(nom));
+  console.log('séquentiel :', unParUn, Date.now() - debut, 'ms');
+
+  debut = Date.now();
+  const ensemble = await Promise.all(noms.map(chercherPlat));
+  console.log('parallèle  :', ensemble, Date.now() - debut, 'ms');
+};
+
+principal();
+
+=== consigne
+## Défi : envoyer les commandes
+
+La fonction `chercherPlat(nom)` est fournie. Elle renvoie une promesse qui donne `{ nom, prix }` après 40 ms, et qui **échoue** si le plat est inconnu. Ne la modifie pas.
+
+1. `preparerCommande(noms)` renvoie une promesse du tableau des plats, dans l'ordre des noms. Les plats doivent être cherchés **en parallèle**.
+2. `totalCommande(noms)` renvoie une promesse du total des prix.
+3. `pipeAsync(...fonctions)` renvoie une fonction qui applique les étapes de gauche à droite et renvoie une promesse. Les étapes peuvent être ordinaires ou asynchrones.
+
+**Règle :** pas de boucle `for` ni `while`, pas de `push`.
+
+=== depart
+// Quête 23 — Les fourneaux en parallèle
+
+// Fournie : ne pas modifier. Simule la cuisine, qui répond après 40 ms.
+const CUISINE = { Burger: 14, Soupe: 7, Risotto: 13, Tiramisu: 6 };
+const chercherPlat = (nom) =>
+  new Promise((resolve, reject) =>
+    setTimeout(() => (nom in CUISINE ? resolve({ nom, prix: CUISINE[nom] }) : reject(new Error(`Plat inconnu : ${nom}`))), 40)
+  );
+
+const preparerCommande = (noms) => {
+  // TODO : tous les plats en parallèle
+};
+
+const totalCommande = async (noms) => {
+  // TODO
+};
+
+const pipeAsync = (...fonctions) => {
+  // TODO
+};
+
+module.exports = { preparerCommande, totalCommande, pipeAsync };
+
+=== solution
+// Quête 23 — Les fourneaux en parallèle
+
+const CUISINE = { Burger: 14, Soupe: 7, Risotto: 13, Tiramisu: 6 };
+const chercherPlat = (nom) =>
+  new Promise((resolve, reject) =>
+    setTimeout(() => (nom in CUISINE ? resolve({ nom, prix: CUISINE[nom] }) : reject(new Error(`Plat inconnu : ${nom}`))), 40)
+  );
+
+const preparerCommande = (noms) => Promise.all(noms.map(chercherPlat));
+
+const totalCommande = async (noms) => {
+  const plats = await preparerCommande(noms);
+  return plats.reduce((somme, plat) => somme + plat.prix, 0);
+};
+
+const pipeAsync = (...fonctions) => (valeur) =>
+  fonctions.reduce((promesse, fn) => promesse.then(fn), Promise.resolve(valeur));
+
+module.exports = { preparerCommande, totalCommande, pipeAsync };
+
+=== indices
+`noms.map(chercherPlat)` donne un tableau de promesses. `Promise.all(...)` les réunit en une seule.
+---
+Dans `totalCommande`, écris `const plats = await preparerCommande(noms);` puis additionne les prix avec `reduce`.
+---
+`pipeAsync` ressemble à `pipe`, mais l'accumulateur est une promesse : `fonctions.reduce((promesse, fn) => promesse.then(fn), Promise.resolve(valeur))`.
+
+=== tests
+interdit(/\b(for|while)\b|\.forEach\(|\.push\(/, 'pas de boucle ni de push');
+test('preparerCommande renvoie les plats dans l\'ordre demandé', async (m, t) =>
+  t.egal(await m.preparerCommande(['Soupe', 'Burger']), [{ nom: 'Soupe', prix: 7 }, { nom: 'Burger', prix: 14 }]));
+test('preparerCommande travaille en parallèle (4 plats en moins de 120 ms)', async (m, t) => {
+  const debut = Date.now();
+  await m.preparerCommande(['Soupe', 'Burger', 'Risotto', 'Tiramisu']);
+  const duree = Date.now() - debut;
+  t.vrai(duree < 120, `Durée mesurée : ${duree} ms. Les plats sont cherchés l'un après l'autre : utilise Promise.all avec map.`);
+});
+test('preparerCommande échoue si un plat est inconnu', async (m, t) => {
+  let message = null;
+  await Promise.resolve(m.preparerCommande(['Soupe', 'Pizza'])).catch((e) => {
+    message = e.message;
+  });
+  t.egal(message, 'Plat inconnu : Pizza', 'La promesse doit échouer avec l\'erreur de la cuisine.');
+});
+test('totalCommande additionne les prix', async (m, t) => t.egal(await m.totalCommande(['Burger', 'Tiramisu']), 20));
+test('totalCommande d\'une commande vide vaut 0', async (m, t) => t.egal(await m.totalCommande([]), 0));
+test('pipeAsync enchaîne des étapes ordinaires et asynchrones', async (m, t) => {
+  const f = m.pipeAsync((x) => x + 1, async (x) => x * 2, (x) => `${x} €`);
+  t.vrai(typeof f === 'function', 'pipeAsync(...) doit renvoyer une fonction.');
+  const promesse = f(3);
+  t.vrai(promesse && typeof promesse.then === 'function', 'La fonction renvoyée par pipeAsync doit renvoyer une promesse.');
+  t.egal(await promesse, '8 €');
+});
+test('pipeAsync() sans étape renvoie une promesse de la valeur', async (m, t) => t.egal(await m.pipeAsync()(5), 5));

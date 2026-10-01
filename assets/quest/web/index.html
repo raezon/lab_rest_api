@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API Lab</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // Thème appliqué avant le premier affichage : choix enregistré, sinon préférence du système.
+    (function () {
+      var choix = null;
+      try { choix = localStorage.getItem('brigade-theme'); } catch (e) {}
+      if (choix !== 'light' && choix !== 'dark') choix = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.dataset.theme = choix;
+    })();
+  </script>
+</head>
+<body>
+  <header class="barre-titre">
+    <div class="marque" id="marque"></div>
+    <div class="titre-droite">
+      <button class="score-haut" id="score-haut" title="Voir le tableau des scores"></button>
+      <button class="btn-theme" id="btn-theme"></button>
+    </div>
+  </header>
+
+  <nav class="barre-activite" id="barre-activite" aria-label="Sections">
+    <button data-vue="quete"><span aria-hidden="true">📜</span>Quêtes</button>
+    <button data-vue="cours"><span aria-hidden="true">📖</span>Cours</button>
+    <button data-vue="memo"><span aria-hidden="true">📑</span>Mémo</button>
+    <button data-vue="score"><span aria-hidden="true">🏆</span>Score</button>
+  </nav>
+
+  <aside class="lateral" id="lateral" aria-label="Liste des quêtes"></aside>
+
+  <main class="principal">
+    <section class="vue-quete" id="vue-quete">
+      <div class="consignes">
+        <div class="onglets" id="onglets-consignes" role="tablist"></div>
+        <div class="contenu prose" id="contenu-consignes"></div>
+      </div>
+      <div class="atelier">
+        <div class="barre-fichiers">
+          <div class="onglets" id="onglets-fichiers" role="tablist"></div>
+          <div class="outils">
+            <button id="btn-reinit" class="discret" title="Revenir au fichier de départ">↺ Réinitialiser</button>
+            <button id="btn-executer" title="Ctrl+Entrée">▶ Exécuter</button>
+            <button id="btn-verifier" class="primaire" title="Ctrl+S">✔ Vérifier</button>
+          </div>
+        </div>
+        <div class="editeur" id="editeur">
+          <pre class="gouttiere" aria-hidden="true"></pre>
+          <div class="zone">
+            <pre class="rendu" aria-hidden="true"><code></code></pre>
+            <textarea spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="Éditeur de code"></textarea>
+          </div>
+        </div>
+        <div class="panneau" id="panneau">
+          <div class="onglets" id="onglets-panneau" role="tablist"></div>
+          <div class="contenu" id="contenu-panneau"></div>
+        </div>
+      </div>
+    </section>
+    <section class="vue-page prose" id="vue-page" hidden></section>
+  </main>
+
+  <footer class="barre-etat" id="barre-etat"></footer>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <div class="voile" id="inscription" hidden>
+    <form class="fiche" id="form-inscription" aria-labelledby="titre-inscription">
+      <h1 id="titre-inscription">Bienvenue en cuisine 👋</h1>
+      <p>Avant de commencer, présente-toi. Ces informations figureront sur ton bilan final. Elles restent sur cet ordinateur, dans ton dossier de travail.</p>
+      <label>Prénom <input name="prenom" required maxlength="80" autocomplete="given-name"></label>
+      <label>Nom <input name="nom" required maxlength="80" autocomplete="family-name"></label>
+      <label>École ou établissement <input name="ecole" required maxlength="80" autocomplete="organization"></label>
+      <p class="erreur" id="erreur-inscription" role="alert" hidden></p>
+      <div class="fiche-actions">
+        <button type="submit" class="bouton primaire">Commencer</button>
+        <button type="button" class="bouton" id="annuler-inscription" hidden>Annuler</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+@notion Webhook, signature HMAC, idempotence
+@xp 150
+
+=== cours
+## Quand c'est le serveur qui t'appelle
+
+> 📞 « Je vous rappelle quand c'est prêt. » Et quand le téléphone sonne, tu vérifies la voix avant de croire l'appel.
+
+Jusqu'ici, ton API **attendait** qu'on l'interroge. Un **webhook** inverse les rôles : un service extérieur (un prestataire de paiement, par exemple) appelle **ton** URL quand un événement se produit chez lui.
+
+## Le problème de confiance
+
+Ton URL de webhook est publique. N'importe qui peut y envoyer un faux message « paiement de 10 000 € reçu ». Il faut une preuve que le message vient bien du prestataire.
+
+## La signature HMAC
+
+Le prestataire et toi partagez un **secret**. Pour chaque message, il calcule une empreinte du corps mêlée à ce secret, et la joint dans un en-tête.
+
+```js
+const crypto = require('crypto');
+
+const signature = crypto.createHmac('sha256', SECRET).update(corps).digest('hex');
+```
+
+De ton côté, tu **recalcules** la signature à partir du corps reçu. Si elle est identique à celle de l'en-tête, le message est authentique et intact. Sans le secret, personne ne peut fabriquer une signature valide.
+
+## Il faut le corps brut
+
+La signature porte sur les **octets exacts** du corps. Si Express le convertit en objet puis que tu le reconvertis en texte, un espace peut changer et la signature ne correspondra plus. On demande donc le corps brut, pour cette route seulement :
+
+```js
+app.post('/webhooks/paiement', express.raw({ type: 'application/json' }), (req, res) => {
+  // req.body est un Buffer (les octets bruts)
+  const evenement = JSON.parse(req.body); // à faire après la vérification
+});
+```
+
+## Comparer sans fuite
+
+Une comparaison avec `===` s'arrête au premier caractère différent : en mesurant le temps de réponse, un attaquant peut deviner la signature caractère par caractère. `timingSafeEqual` prend toujours le même temps.
+
+```js
+const a = Buffer.from(attendue);
+const b = Buffer.from(recue);
+const valide = a.length === b.length && crypto.timingSafeEqual(a, b);
+```
+
+Elle lève une erreur si les longueurs diffèrent : on les compare d'abord.
+
+## L'idempotence
+
+Un prestataire **renvoie** un webhook s'il n'a pas reçu de réponse assez vite. Le même événement peut donc arriver deux fois. Ton traitement doit être **idempotent** : le recevoir deux fois a le même effet qu'une seule.
+
+La solution : chaque événement a un identifiant. Si tu l'as déjà traité, tu réponds `200` sans rien refaire.
+
+```js
+if (!paiements.some((p) => p.id === evenement.id)) paiements.push(evenement);
+```
+
+=== doc
+## Vérifier une signature
+
+```js
+const attendue = crypto.createHmac('sha256', WEBHOOK_SECRET).update(req.body).digest('hex');
+const recue = req.headers['x-signature'] || '';
+
+const a = Buffer.from(attendue);
+const b = Buffer.from(recue);
+if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+  return res.status(401).json({ error: 'Signature invalide' });
+}
+```
+
+## Corps brut
+
+```js
+express.raw({ type: 'application/json' })  // req.body devient un Buffer
+JSON.parse(req.body)                       // Buffer → objet
+```
+
+## En-têtes
+
+Express met les noms d'en-têtes en minuscules : `req.headers['x-signature']`.
+
+## Dans l'onglet Requête
+
+`{{signature}}` est remplacé par la signature correcte du corps que tu envoies, comme le ferait le prestataire :
+
+```js
+X-Signature: {{signature}}
+```
+
+Modifie le corps sans toucher à l'en-tête : la signature reste juste. Remplace `{{signature}}` par un texte quelconque : ton serveur doit répondre `401`.
+
+=== exemple
+// Exemple — signer un message, le vérifier, puis détecter une falsification.
+const crypto = require('crypto');
+
+const SECRET = 'secret-partage';
+const signer = (corps) => crypto.createHmac('sha256', SECRET).update(corps).digest('hex');
+
+const corps = '{"id":"evt_1","montant":2400}';
+const signature = signer(corps);
+console.log('signature :', signature);
+
+const verifier = (corpsRecu, signatureRecue) => {
+  const a = Buffer.from(signer(corpsRecu));
+  const b = Buffer.from(signatureRecue);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
+
+console.log('message intact        :', verifier(corps, signature));
+console.log('montant modifié       :', verifier('{"id":"evt_1","montant":999999}', signature));
+console.log('signature inventée    :', verifier(corps, 'abc'));
+console.log('sans le bon secret    :', verifier(corps, crypto.createHmac('sha256', 'autre').update(corps).digest('hex')));
+
+=== requetes
+POST /webhooks/paiement | {"id":"evt_1","type":"paiement.reussi","montant":2400} | X-Signature: {{signature}}
+POST /webhooks/paiement | {"id":"evt_2","type":"paiement.reussi","montant":999999} | X-Signature: fausse
+POST /webhooks/paiement | {"id":"evt_3","type":"paiement.reussi","montant":50}
+GET /api/paiements
+
+=== indices
+Déclare la route avec le corps brut : `app.post('/webhooks/paiement', express.raw({ type: 'application/json' }), (req, res) => { … })`. `req.body` est alors un Buffer.
+---
+Recalcule la signature : `const attendue = crypto.createHmac('sha256', WEBHOOK_SECRET).update(req.body).digest('hex');`.
+---
+Lis celle du prestataire : `const recue = req.headers['x-signature'] || '';`. Le `|| ''` évite un plantage quand l'en-tête est absent.
+---
+Compare sans fuite : `const a = Buffer.from(attendue);` et `const b = Buffer.from(recue);`, puis `if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(401).json({ error: 'Signature invalide' });`.
+---
+Seulement après cette vérification, lis l'événement : `const evenement = JSON.parse(req.body);`.
+---
+Idempotence : `if (!paiements.some((p) => p.id === evenement.id)) paiements.push(evenement);`, puis `res.json({ recu: true })` dans tous les cas.

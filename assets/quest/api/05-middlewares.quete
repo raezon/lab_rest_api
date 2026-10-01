@@ -1,0 +1,161 @@
+@notion Pipeline de middlewares, 404 et 500 en JSON
+@xp 120
+
+=== cours
+## Le middleware : un poste sur la chaîne
+
+> 🍽 La brigade : chaque poste reçoit l'assiette, fait sa part, puis la passe au suivant.
+
+Dans Express, une requête traverse une **suite de fonctions** avant d'obtenir sa réponse. Chacune s'appelle un **middleware**.
+
+```js
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next(); // passe la main au suivant
+});
+```
+
+Un middleware a deux possibilités :
+
+- appeler `next()` pour laisser la requête continuer ;
+- **répondre** lui-même (`res.json(...)`), ce qui arrête la chaîne.
+
+S'il ne fait ni l'un ni l'autre, la requête reste bloquée.
+
+## L'ordre compte
+
+Les middlewares s'exécutent **dans l'ordre où ils sont déclarés**. Un journal déclaré après les routes ne verra jamais les requêtes auxquelles elles ont déjà répondu.
+
+```js
+app.use(journal);        // 1. toutes les requêtes passent ici
+app.get('/api/ping', …); // 2. les routes
+app.use(routeInconnue);  // 3. si aucune route n'a répondu
+app.use(erreurs);        // 4. si une erreur a été levée
+```
+
+## Le 404 personnalisé
+
+Un middleware placé **après toutes les routes** ne reçoit que les requêtes restées sans réponse.
+
+```js
+app.use((req, res) => res.status(404).json({ error: 'Route inconnue' }));
+```
+
+## Le gestionnaire d'erreurs
+
+C'est un middleware à **quatre arguments**. Express le reconnaît à ce nombre et lui envoie toute erreur levée dans une route.
+
+```js
+app.use((err, req, res, next) => {
+  console.error(err.message);                    // pour toi, dans les journaux
+  res.status(500).json({ error: 'Erreur interne' }); // pour le client
+});
+```
+
+## Ne jamais fuiter
+
+Le message d'une erreur et sa pile d'appels décrivent l'intérieur de ton serveur. Un attaquant s'en sert. Le client reçoit un message **générique** ; les détails restent dans tes journaux.
+
+## Poser un en-tête
+
+Un en-tête doit être défini **avant** l'envoi de la réponse.
+
+```js
+res.setHeader('X-Response-Time', '3ms');
+```
+
+Tout est middleware dans Express : `express.json()`, l'authentification, la limitation de débit des prochaines étapes.
+
+=== doc
+## Signatures
+
+```js
+(req, res, next) => { … }        // middleware
+(err, req, res, next) => { … }   // gestionnaire d'erreurs (4 arguments)
+```
+
+## Montage
+
+```js
+app.use(mw)             // pour toutes les requêtes
+app.use('/api', mw)     // seulement sous /api
+app.get('/x', mw, handler) // seulement pour cette route
+```
+
+## Ordre recommandé
+
+1. middlewares généraux (journal, `express.json()`)
+2. routes
+3. 404
+4. gestionnaire d'erreurs
+
+## En-têtes
+
+```js
+res.setHeader('Nom', 'valeur')  // avant l'envoi
+res.getHeader('Nom')
+```
+
+## Mesurer une durée
+
+```js
+const debut = Date.now();
+// …
+const duree = `${Date.now() - debut}ms`;
+```
+
+## Le journal dans l'onglet Requête
+
+La **console du serveur** s'affiche sous la réponse : tu y vois ce que ton middleware a écrit avec `console.log`.
+
+=== exemple
+// Exemple — l'ordre des middlewares, et une erreur attrapée proprement.
+const express = require('express');
+const app = express();
+
+// 1. S'exécute pour toutes les requêtes, avant les routes
+app.use((req, res, next) => {
+  res.setHeader('X-Cuisine', 'ouverte');
+  console.log('  [journal]', req.method, req.url);
+  next();
+});
+
+app.get('/carte', (req, res) => res.json(['Pizza', 'Burger']));
+app.get('/panne', () => { throw new Error('Le frigo est en panne (détail interne)'); });
+
+// 2. Aucune route n'a répondu
+app.use((req, res) => res.status(404).json({ error: 'Rien à cette adresse' }));
+
+// 3. Une erreur a été levée : 4 arguments
+app.use((err, req, res, next) => {
+  console.log('  [erreurs] noté pour l\'équipe :', err.message);
+  res.status(500).json({ error: 'Un problème est survenu' });
+});
+
+const serveur = app.listen(0, async () => {
+  const base = `http://localhost:${serveur.address().port}`;
+  for (const chemin of ['/carte', '/dessert', '/panne']) {
+    const res = await fetch(base + chemin);
+    console.log(`GET ${chemin} → ${res.status}`, await res.text(), '· X-Cuisine :', res.headers.get('x-cuisine'));
+  }
+  serveur.closeAllConnections();
+  serveur.close();
+});
+
+=== requetes
+GET /api/ping
+GET /nimporte/quoi
+GET /api/boom
+
+=== indices
+Un middleware se déclare avec `app.use((req, res, next) => { … })`. Place-le avant les routes : déclaré après, il ne verrait jamais les requêtes.
+---
+Pour le journal : `console.log(req.method + ' ' + req.url)`. Les tests cherchent le texte « GET /api/ping » dans la console du serveur.
+---
+Un en-tête se pose avant l'envoi de la réponse : `res.setHeader('X-Response-Time', '0ms')`, puis `next()` pour passer la main.
+---
+Route inconnue : après toutes les routes, `app.use((req, res) => res.status(404).json({ error: 'Route inconnue' }));`.
+---
+Gestionnaire d'erreurs : tout à la fin, avec quatre paramètres, `app.use((err, req, res, next) => { … })`. Avec trois seulement, Express le prend pour un middleware ordinaire.
+---
+Dans ce gestionnaire : `res.status(500).json({ error: 'Erreur interne' })`. N'y renvoie ni `err.message` ni `err.stack` : garde-les pour `console.error`.

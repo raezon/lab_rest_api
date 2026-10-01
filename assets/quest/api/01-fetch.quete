@@ -1,0 +1,132 @@
+@notion Requête, réponse, codes de statut, fetch
+@xp 60
+
+=== cours
+## Une API, c'est un contrat
+
+> 🍽 Tu es le client du restaurant. Tu ne vois jamais la cuisine : tu lis la carte, tu passes commande, on t'apporte un plat. La carte, c'est l'API.
+
+Avant de construire une API, il faut savoir en **utiliser** une. Tout échange HTTP tient en deux messages.
+
+## La requête (ce que le client envoie)
+
+- une **méthode** : `GET` pour lire, `POST` pour créer, `PUT` pour remplacer, `DELETE` pour supprimer ;
+- une **URL** : la ressource visée, par exemple `/users/1` ;
+- des **en-têtes** : des informations sur la requête, par exemple `Content-Type: application/json` ;
+- un **corps** (facultatif) : les données envoyées, en JSON.
+
+## La réponse (ce que le serveur renvoie)
+
+- un **code de statut** : le verdict, en trois chiffres ;
+- des **en-têtes** ;
+- un **corps**, le plus souvent en JSON.
+
+## Les familles de codes
+
+- `2xx` : tout s'est bien passé (`200 OK`, `201 Created`)
+- `4xx` : le client s'est trompé (`400`, `401`, `404`)
+- `5xx` : le serveur a un problème (`500`)
+
+## fetch
+
+Node.js fournit `fetch`. Elle renvoie une promesse : on l'attend avec `await`.
+
+```js
+const res = await fetch('http://localhost:4000/users/1');
+const user = await res.json(); // lit le corps et le convertit depuis le JSON
+```
+
+## Le piège
+
+`fetch` ne lève **aucune erreur** sur un `404` ou un `500`. Pour elle, une réponse est une réponse. C'est à toi de vérifier :
+
+```js
+if (!res.ok) throw new Error(`HTTP ${res.status}`);
+```
+
+`res.ok` vaut `true` uniquement pour les codes `2xx`.
+
+## Envoyer des données
+
+Pour un `POST`, il faut dire au serveur que le corps est du JSON, et convertir l'objet en texte :
+
+```js
+const res = await fetch(url, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ title: 'Bonjour' }),
+});
+```
+
+=== doc
+## fetch en bref
+
+```js
+const res = await fetch(url);                 // GET
+res.status      // 200, 404…
+res.ok          // true si 2xx
+res.headers.get('content-type')
+await res.json()  // corps JSON → objet
+await res.text()  // corps brut
+```
+
+## POST JSON
+
+```js
+await fetch(url, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(objet),
+});
+```
+
+## Gérer l'échec
+
+```js
+try {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.json();
+} catch (err) {
+  console.log('Échec :', err.message);
+  return null;
+}
+```
+
+## L'API de démonstration
+
+apilab la fournit à l'adresse contenue dans `process.env.API_URL` :
+
+- `GET /users/1` renvoie un utilisateur ; tout autre identifiant renvoie `404`
+- `POST /posts` avec un corps JSON `{ title }` renvoie `201` et le post créé
+
+=== exemple
+// Exemple — observe une requête et sa réponse. Clique sur « Exécuter ».
+const API = process.env.API_URL; // l'API de démonstration fournie par apilab
+
+(async () => {
+  const res = await fetch(`${API}/users/1`);
+  console.log('statut :', res.status, '· ok :', res.ok);
+  console.log('type   :', res.headers.get('content-type'));
+  console.log('corps  :', await res.json());
+
+  // Un identifiant inconnu : fetch ne lève pas d'erreur, il faut regarder res.ok
+  const absent = await fetch(`${API}/users/999`);
+  console.log('utilisateur 999 → statut', absent.status, '· ok :', absent.ok);
+})();
+
+=== consigne
+L'API de démonstration est décrite dans l'onglet **Doc**. Le programme, en bas du fichier, appelle déjà tes deux fonctions : il doit afficher l'utilisateur 1, puis `Échec : HTTP 404`, puis `Créé : 101 (statut 201)`.
+
+=== indices
+Commence par `getUser`. Appelle l'API et attends la réponse : `const res = await fetch(...)`, avec l'adresse `${API}/users/${id}` écrite dans un gabarit (entre accents graves).
+---
+Juste après, regarde `res.ok`. S'il est faux, lève toi-même une erreur : `throw new Error('HTTP ' + res.status)`. Sans cela, un 404 passe inaperçu.
+---
+Si la réponse est bonne, termine par `return await res.json();` pour renvoyer l'objet lu dans le corps.
+---
+Entoure le tout d'un `try { … } catch (err) { … }`. Dans le `catch` : `console.log('Échec :', err.message)` puis `return null`.
+---
+`creerPost` : donne un second argument à `fetch`, un objet avec `method: 'POST'`, `headers: { 'Content-Type': 'application/json' }` et `body: JSON.stringify({ title: titre, userId: 1 })`.
+---
+Lis ensuite le post créé avec `const post = await res.json();` et affiche exactement `console.log('Créé :', post.id, '(statut', res.status + ')')`.

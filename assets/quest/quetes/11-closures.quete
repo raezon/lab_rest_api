@@ -1,0 +1,164 @@
+@chapitre 3 · La fabrique à fonctions
+@titre La fabrique à remises
+@notion Closures : une fonction qui se souvient
+@xp 120
+@retenir une fonction renvoyée par une autre garde en mémoire les variables de celle qui l'a créée : c'est une closure.
+
+=== cours
+## Une fonction qui fabrique des fonctions
+
+> 🍽 Le chef règle un minuteur sur 12 minutes et le tend au commis. Le commis n'a plus besoin de connaître la durée : le minuteur **s'en souvient**.
+
+Une fonction peut en renvoyer une autre. La fonction renvoyée **garde l'accès** aux paramètres de celle qui l'a créée, même après la fin de celle-ci.
+
+```js
+const creerMultiplicateur = (facteur) => {
+  return (nombre) => nombre * facteur;
+};
+
+const doubler = creerMultiplicateur(2);
+const tripler = creerMultiplicateur(3);
+
+doubler(10); // 20
+tripler(10); // 30
+```
+
+`doubler` se souvient que `facteur` vaut `2`. Cette mémoire s'appelle une **closure** (ou *fermeture*).
+
+## Écriture courte
+
+Deux flèches à la suite : la première reçoit la configuration, la seconde la donnée.
+
+```js
+const creerMultiplicateur = (facteur) => (nombre) => nombre * facteur;
+```
+
+## Chaque fabrication est indépendante
+
+`doubler` et `tripler` ont chacune **leur propre** `facteur`. Elles ne se marchent pas dessus.
+
+## À quoi ça sert
+
+À **configurer une fois, utiliser partout**. C'est particulièrement utile avec `map` et `filter`, qui attendent une fonction à un seul paramètre :
+
+```js
+const moinsCherQue = (max) => (plat) => plat.prix <= max;
+
+menu.filter(moinsCherQue(10));
+```
+
+`moinsCherQue(10)` fabrique le prédicat dont `filter` a besoin.
+
+=== doc
+## Fabrique de fonctions
+
+```js
+const fabrique = (config) => (donnee) => resultat;
+
+const outil = fabrique('réglage'); // on configure
+outil(donnee);                     // on utilise
+fabrique('réglage')(donnee);       // ou les deux d'un coup
+```
+
+## Closure
+
+La fonction intérieure peut lire les variables de la fonction extérieure, même une fois celle-ci terminée.
+
+## Fabriquer un prédicat pour filter
+
+```js
+const deCategorie = (categorie) => (plat) => plat.categorie === categorie;
+
+menu.filter(deCategorie('dessert'));
+```
+
+## Fabriquer une transformation pour map
+
+```js
+const ajouter = (n) => (x) => x + n;
+
+[1, 2, 3].map(ajouter(10)); // [11, 12, 13]
+```
+
+=== exemple
+// Une fabrique : on configure une fois, on réutilise ensuite.
+
+const creerMultiplicateur = (facteur) => (nombre) => nombre * facteur;
+
+const doubler = creerMultiplicateur(2);
+const tripler = creerMultiplicateur(3);
+
+console.log(doubler(10), tripler(10)); // chacune se souvient de son facteur
+
+// Très pratique avec filter et map :
+const moinsCherQue = (max) => (plat) => plat.prix <= max;
+const menu = [{ nom: 'Soupe', prix: 7 }, { nom: 'Burger', prix: 14 }];
+
+console.log(menu.filter(moinsCherQue(10)));
+console.log([1, 2, 3].map(creerMultiplicateur(100)));
+
+=== consigne
+## Défi : la fabrique du restaurant
+
+Écris trois **fabriques**, c'est-à-dire trois fonctions qui renvoient une fonction :
+
+1. `creerRemise(pourcent)` renvoie une fonction `(prix) => prix remisé`. `creerRemise(20)(50)` renvoie `40`.
+2. `creerFormateur(devise)` renvoie une fonction `(prix) => texte`. `creerFormateur('€')(12)` renvoie `12 €`.
+3. `deCategorie(categorie)` renvoie un **prédicat** `(plat) => true/false`, utilisable avec `filter`.
+
+=== depart
+// Quête 11 — La fabrique à remises
+
+const creerRemise = (pourcent) => {
+  // TODO : renvoyer une fonction (prix) => ...
+};
+
+const creerFormateur = (devise) => {
+  // TODO : renvoyer une fonction (prix) => '12 €'
+};
+
+const deCategorie = (categorie) => {
+  // TODO : renvoyer un prédicat (plat) => ...
+};
+
+module.exports = { creerRemise, creerFormateur, deCategorie };
+
+=== solution
+// Quête 11 — La fabrique à remises
+
+const creerRemise = (pourcent) => (prix) => prix * (1 - pourcent / 100);
+
+const creerFormateur = (devise) => (prix) => `${prix} ${devise}`;
+
+const deCategorie = (categorie) => (plat) => plat.categorie === categorie;
+
+module.exports = { creerRemise, creerFormateur, deCategorie };
+
+=== indices
+Chaque fabrique s'écrit avec deux flèches : `(config) => (donnee) => resultat`.
+---
+Une remise de 20 % revient à multiplier par `1 - 20 / 100`, soit `0.8`. Donc `(prix) => prix * (1 - pourcent / 100)`.
+---
+`const deCategorie = (categorie) => (plat) => plat.categorie === categorie;` La fonction intérieure se souvient de `categorie`.
+
+=== tests
+const MENU = [
+  { nom: 'Soupe', categorie: 'entrée' },
+  { nom: 'Burger', categorie: 'plat' },
+  { nom: 'Risotto', categorie: 'plat' },
+];
+test('creerRemise renvoie une fonction', (m, t) =>
+  t.vrai(typeof m.creerRemise(20) === 'function', `creerRemise(20) renvoie ${typeof m.creerRemise(20)} au lieu d'une fonction.`));
+test('creerRemise(20)(50) renvoie 40', (m, t) => t.proche(m.creerRemise(20)(50), 40));
+test('deux remises créées séparément restent indépendantes', (m, t) => {
+  const etudiant = m.creerRemise(20);
+  const fidele = m.creerRemise(10);
+  t.proche(etudiant(100), 80);
+  t.proche(fidele(100), 90);
+  t.proche(etudiant(100), 80, 'La première remise a changé après la création de la seconde.');
+});
+test("creerFormateur('€')(12) renvoie « 12 € »", (m, t) => t.egal(m.creerFormateur('€')(12), '12 €'));
+test("creerFormateur('$')(8) renvoie « 8 $ »", (m, t) => t.egal(m.creerFormateur('$')(8), '8 $'));
+test("deCategorie('plat') fonctionne avec filter", (m, t) =>
+  t.egal(MENU.filter(m.deCategorie('plat')).map((p) => p.nom), ['Burger', 'Risotto']));
+test('les fabriques se combinent avec map', (m, t) => t.egal([10, 20].map(m.creerFormateur('€')), ['10 €', '20 €']));
