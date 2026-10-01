@@ -4,11 +4,104 @@
 Il affiche la notion du cours, une analogie et les consignes, puis **surveille le fichier JavaScript** de l'étudiant.
 **À chaque sauvegarde, il relance automatiquement les tests** (de vraies requêtes HTTP envoyées au serveur Express de l'étudiant), affiche ✔ / ✖ avec l'explication, et passe à l'étape suivante quand tout est vert.
 
-Prérequis côté étudiant : **Node.js ≥ 18** et un éditeur. Pas besoin d'installer Go : on distribue le binaire.
+Il existe aussi en **interface web** (`apilab quest`) : éditeur, cours, exemples, défis, mini-client HTTP, score et bilan final dans le navigateur.
 
 ---
 
-## Démarrage (étudiant)
+## Installation : trois façons de lancer apilab
+
+Choisissez selon ce qui est installé sur la machine. **Go n'est nécessaire que pour la troisième.**
+
+| Vous avez… | Commande | Ce qu'il faut installer |
+|---|---|---|
+| **Docker** | `docker compose up` (ou `make docker-run`) | Docker uniquement : ni Go, ni Node.js |
+| **Le binaire fourni par l'enseignant** | `./apilab quest` | Node.js ≥ 18 |
+| **Les sources** | `make run` | Go ≥ 1.24 et Node.js ≥ 18 |
+
+Dans les trois cas, l'interface s'ouvre sur **http://127.0.0.1:4321/**.
+
+### 1. Avec Docker (aucune autre installation)
+
+```bash
+git clone https://github.com/raezon/lab_rest_api.git
+cd lab_rest_api
+docker compose up          # la première fois, construit l'image (quelques minutes)
+```
+
+Ouvrez ensuite http://127.0.0.1:4321/ dans le navigateur. `Ctrl+C` arrête le conteneur.
+
+- **Votre travail est conservé** dans le dossier `travail/` du projet (code dans `travail/quete-api/code/`, score dans `progression.json`, inscription dans `profil.json`). Vous pouvez arrêter et relancer le conteneur sans rien perdre, et ouvrir ces fichiers avec votre éditeur habituel.
+- L'image contient déjà Node.js, express et jsonwebtoken : **aucun accès à Internet n'est nécessaire** une fois l'image construite.
+- Le port n'est publié que sur l'adresse locale (`127.0.0.1`) : l'outil exécute du code, il ne doit pas être joignable depuis le réseau.
+
+Sans `docker compose`, l'équivalent en deux commandes :
+
+```bash
+docker build -t apilab .
+docker run --rm -p 127.0.0.1:4321:4321 -v "$PWD/travail:/work" apilab
+```
+
+Variantes utiles :
+
+```bash
+APILAB_PORT=8080 docker compose up                                # autre port : http://127.0.0.1:8080/
+APILAB_UID=$(id -u) APILAB_GID=$(id -g) docker compose up        # Linux, si votre identifiant n'est pas 1000
+docker compose run --rm --service-ports apilab quest --no-open --parcours fp   # parcours « paradigme fonctionnel »
+```
+
+En cas de message `permission denied` sous Linux : le dossier `travail/` doit exister et vous appartenir. Il est fourni dans le dépôt ; s'il a été supprimé, recréez-le avec `mkdir travail` avant de lancer Docker.
+
+### 2. Avec le binaire fourni
+
+L'enseignant compile un binaire par système (`make dist`, voir plus bas) et le distribue. Il suffit alors d'avoir **Node.js ≥ 18** :
+
+```bash
+./apilab quest             # Linux et macOS (Windows : apilab.exe quest)
+```
+
+### 3. Depuis les sources, avec le Makefile
+
+```bash
+make run                   # compile puis lance l'interface web
+```
+
+`make` (ou `make help`) affiche toutes les cibles :
+
+| Cible | Rôle | Nécessite |
+|---|---|---|
+| `make build` | compile le binaire `./apilab` | Go |
+| `make run` | compile et lance l'interface web (API REST guidée) | Go, Node.js |
+| `make run-fp` | idem, sur le parcours « paradigme fonctionnel » | Go, Node.js |
+| `make cli` | prépare le TP en terminal dans `api-lab/` | Go, Node.js |
+| `make test` | vérifie le code Go et les 35 quêtes (corrections, fichiers de départ, exemples) | Go, Node.js |
+| `make fmt` | formate le code Go | Go |
+| `make dist` | compile les binaires Linux, Windows et macOS dans `dist/` | Go |
+| `make clean` | supprime le binaire et les dossiers de test (le travail des élèves est conservé) | — |
+| `make docker-build` | construit l'image Docker `apilab` | Docker |
+| `make docker-run` | lance l'interface web dans Docker, travail conservé dans `travail/` | Docker |
+| `make docker-run-fp` | idem, sur le parcours « paradigme fonctionnel » | Docker |
+| `make docker-test` | vérifie les 35 quêtes à l'intérieur de l'image | Docker |
+| `make docker-clean` | supprime l'image Docker | Docker |
+
+Le port se change avec `PORT` : `make run PORT=8080` ou `make docker-run PORT=8080`.
+
+Sous Windows, `make` n'est pas installé par défaut : utilisez `docker compose up`, ou les commandes `go build` de la section « Compiler et distribuer ».
+
+### Comment fonctionne l'image Docker
+
+Le `Dockerfile` procède en trois étapes, pour une image finale légère (environ 180 Mo, sans Go) :
+
+1. **Compilation** : une image `golang` compile le binaire `apilab`. Les contenus (quêtes, corrections, interface web) y sont embarqués.
+2. **Dépendances** : une image `node` installe express et jsonwebtoken, dont les exercices ont besoin.
+3. **Image finale** : Node.js, le binaire et ces dépendances. Go n'y figure pas.
+
+Trois variables d'environnement y sont fixées : `APILAB_HOST=0.0.0.0` (dans un conteneur, le serveur doit écouter sur toutes les interfaces pour que le port publié soit joignable ; hors Docker, il n'écoute que sur `127.0.0.1`), `NODE_PATH` (où trouver express et jsonwebtoken, ce qui évite tout `npm install` au démarrage) et `HOME=/tmp`. Le dossier `/work` du conteneur reçoit le travail de l'élève : c'est lui qu'on relie à `travail/`.
+
+---
+
+## Démarrage en terminal (étudiant)
+
+Prérequis : **Node.js ≥ 18**, un éditeur et le binaire `apilab`.
 
 ```bash
 apilab init            # crée le dossier api-lab/ avec les 10 fichiers d'exercice
@@ -77,7 +170,7 @@ apilab quest --parcours fp      # parcours « paradigme fonctionnel » (25 quêt
 apilab quest selftest           # enseignant : vérifie les quêtes (correction, départ, exemple) ; accepte --parcours
 ```
 
-Options : `apilab quest [dossier] [--parcours api|fp] [--port 4321] [--no-open]`.
+Options : `apilab quest [dossier] [--parcours api|fp] [--port 4321] [--host 127.0.0.1] [--no-open]`. L'adresse d'écoute se règle aussi avec la variable `APILAB_HOST` ; ne la changez que dans un conteneur.
 
 Une interface web façon VS Code (liste des quêtes, éditeur avec coloration, sortie, tests, thèmes clair et sombre). Chaque quête suit le même déroulé : **cours** → **exemple à exécuter** → **défi** vérifié par des tests → **doc** et **indices**.
 
@@ -120,13 +213,19 @@ Après toute modification : recompiler, puis `apilab quest selftest`.
 ## Compiler et distribuer
 
 ```bash
+make dist      # les quatre binaires d'un coup, dans dist/
+```
+
+ou, sans `make` :
+
+```bash
 go build -o apilab .                                   # votre machine
 GOOS=windows GOARCH=amd64 go build -o apilab.exe .     # Windows
 GOOS=darwin  GOARCH=arm64 go build -o apilab-mac .     # Mac Apple Silicon
 GOOS=linux   GOARCH=amd64 go build -o apilab-linux .   # Linux
 ```
 
-Les binaires ne sont pas versionnés : compilez-les avec les commandes ci-dessus (Go ≥ 1.24) et distribuez-les aux étudiants. Aucune dépendance Go externe : starters, corrections et tests sont embarqués dans le binaire (`embed`).
+Les binaires ne sont pas versionnés : compilez-les (Go ≥ 1.24) et distribuez-les aux étudiants, qui n'ont alors besoin que de Node.js. Pour ceux qui n'ont ni Go ni Node.js, voir la section Docker. Aucune dépendance Go externe : starters, corrections et tests sont embarqués dans le binaire (`embed`).
 
 ## Ajouter une étape
 

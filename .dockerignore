@@ -1,0 +1,10 @@
+# Seuls les sources et les contenus entrent dans l'image.
+.git
+dist
+apilab
+apilab.exe
+api-lab
+quete-api
+quete-fp
+travail
+**/node_modules

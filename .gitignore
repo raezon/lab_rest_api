@@ -8,3 +8,8 @@
 /quete-api/
 /quete-fp/
 node_modules/
+
+# Dossiers créés par le Makefile et Docker
+/.selftest/
+/travail/*
+!/travail/.gitkeep

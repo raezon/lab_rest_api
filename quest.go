@@ -322,7 +322,7 @@ func nouveauServeurQuete(dir string, p parcours) (*questServer, error) {
 	}
 	for _, d := range []string{"code", filepath.Join(".moteur", "quetes")} {
 		if err := os.MkdirAll(filepath.Join(abs, d), 0o755); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("impossible d'écrire dans %s : %v\n  Vérifiez les droits du dossier. Avec Docker, le dossier monté sur /work doit exister et vous appartenir (mkdir travail)", abs, err)
 		}
 	}
 	for _, q := range s.quetes {
@@ -371,9 +371,16 @@ func (s *questServer) installerDependances() {
 		b, _ := assets.ReadFile("assets/package.json")
 		_ = os.WriteFile(pkg, b, 0o644)
 	}
+	// Un module est disponible s'il est dans l'espace de travail ou dans NODE_PATH
+	// (l'image Docker fournit ainsi express et jsonwebtoken sans accès au réseau).
 	present := func(module string) bool {
-		_, err := os.Stat(filepath.Join(s.dir, "node_modules", module, "package.json"))
-		return err == nil
+		dossiers := append([]string{filepath.Join(s.dir, "node_modules")}, filepath.SplitList(os.Getenv("NODE_PATH"))...)
+		for _, d := range dossiers {
+			if _, err := os.Stat(filepath.Join(d, module, "package.json")); err == nil {
+				return true
+			}
+		}
+		return false
 	}
 	if present("express") && present("jsonwebtoken") {
 		return
@@ -930,18 +937,26 @@ func (s *questServer) hReinitTout(w http.ResponseWriter, r *http.Request) {
 
 func cmdQuest(args []string) error {
 	p, dir, port, ouvrir, selftest := parcoursConnus["api"], "", 4321, true, false
+	// Adresse d'écoute : locale par défaut. Dans un conteneur, 0.0.0.0 est
+	// nécessaire pour que le port publié soit joignable depuis la machine hôte.
+	hote := os.Getenv("APILAB_HOST")
+	if hote == "" {
+		hote = "127.0.0.1"
+	}
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; a {
 		case "selftest":
 			selftest = true
 		case "--no-open":
 			ouvrir = false
-		case "--port", "--parcours":
+		case "--port", "--parcours", "--host":
 			if i+1 >= len(args) {
 				return fmt.Errorf("%s attend une valeur", a)
 			}
 			i++
-			if a == "--port" {
+			if a == "--host" {
+				hote = args[i]
+			} else if a == "--port" {
 				n, err := strconv.Atoi(args[i])
 				if err != nil {
 					return fmt.Errorf("port invalide : %s", args[i])
@@ -974,14 +989,15 @@ func cmdQuest(args []string) error {
 		if port != 0 {
 			cible = port + essai
 		}
-		if l, err = net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", cible)); err == nil {
+		if l, err = net.Listen("tcp", net.JoinHostPort(hote, strconv.Itoa(cible))); err == nil {
 			break
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("aucun port libre à partir de %d", port)
+		return fmt.Errorf("écoute impossible sur %s à partir du port %d : %v", hote, port, err)
 	}
-	url := "http://" + l.Addr().String() + "/"
+	// L'interface se consulte toujours par l'adresse locale, quel que soit l'hôte d'écoute.
+	url := fmt.Sprintf("http://127.0.0.1:%d/", l.Addr().(*net.TCPAddr).Port)
 	if !selftest {
 		fmt.Println(c(bold+cyan, "\n  apilab quest") + " — " + p.Titre + " : " + p.SousTitre)
 	}

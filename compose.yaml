@@ -1,0 +1,15 @@
+# Lancement en une commande :  docker compose up
+# puis ouvrir http://127.0.0.1:4321/  (Ctrl+C pour arrêter)
+services:
+  apilab:
+    build: .
+    image: apilab
+    # Publié sur l'adresse locale uniquement : l'outil exécute du code, il ne doit pas être joignable depuis le réseau.
+    ports:
+      - "127.0.0.1:${APILAB_PORT:-4321}:4321"
+    # Le code, le score et le profil de l'élève sont conservés dans ./travail
+    volumes:
+      - ./travail:/work
+    # Sous Linux, les fichiers créés appartiennent à l'utilisateur courant (1000 par défaut).
+    user: "${APILAB_UID:-1000}:${APILAB_GID:-1000}"
+    init: true
